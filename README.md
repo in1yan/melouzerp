@@ -1,36 +1,79 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MELOUZ OS
 
-## Getting Started
+Polished project management + ERP inspired by Notion and Plane.so. Runs fully on localhost
+with real authentication and durable local data — no external services required.
 
-First, run the development server:
+## Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# open http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sign up as a **lead** or **employee** (pick your role on the sign-up page). New accounts are
+**pending** until an admin approves them — you can log in, but you'll see an "awaiting
+approval" screen. Approve/reject requests from the **Approvals** tab. Everyone who is
+approved joins one shared **company workspace**, so accounts in different browsers see each
+other's work. Use the **Performance** tab to see metrics (admins see everyone including
+leads; leads see their employees).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Default admin** (seeded on first run, configurable via env):
+`admin@melouz.local` / `admin12345`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Architecture
 
-## Learn More
+- **Auth** — self-contained, no Supabase. Passwords are hashed with Node `scrypt`
+  (`src/lib/auth.ts`). Sessions are random tokens stored in an `httpOnly` cookie
+  (`melouz_session`, 30-day TTL) and validated per request.
+- **Data** — a typed JSON store at `~/.melouz-os/data/db.json` (`src/lib/store.ts`) written
+  atomically (temp file + rename). It lives **outside** the project folder on purpose so that
+  writes don't trigger Next.js/Turbopack dev recompiles. Override with `MELOUZ_DATA_DIR`.
+  Survives server restarts.
+- **API** — REST route handlers under `src/app/api/**` with zod validation
+  (`src/lib/api.ts`) and role checks (owner/admin/lead/employee).
+- **Route protection** — `src/proxy.ts` (Next.js 16 Proxy, formerly middleware) guards
+  `/dashboard` and `/api/*` by cookie presence; a client `401` listener redirects to `/login`.
+- **AI assistant** — real provider call via `/api/ai` using an OpenAI-compatible endpoint.
+  Without `AI_API_KEY` it returns a 503 setup hint instead of fabricating answers.
 
-To learn more about Next.js, take a look at the following resources:
+## Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Workspaces, Projects, Issues, Kanban (drag-and-drop), Calendar, Teams, Documents
+- **Roles & approvals** — sign up as lead/employee; an admin approves or rejects requests
+  (with a reason) before you join the shared company workspace
+- **Performance metrics** — per-member assigned/approved/rejected/completion/avg-approval
+  (admins see everyone including leads; leads see their employees)
+- **Work assignment & submissions** — admins/leads assign issues to members or groups;
+  assignees submit a description, proof-of-work files (PDF/image/text/zip), and code/doc
+  attachments with an automatic system-time submission timestamp; reviewers approve or
+  request changes; leads, admins, and the assigner are notified on each submission
+- **Team calendar** — admins, leads, and employees schedule events with a meeting link,
+  reason/agenda, attendees, time (or all-day), location, and visibility
+- **Messages** — slide-out chat from the left (sidebar/header icon) to message any
+  teammate directly, with unread badges and notifications
+- Real command palette (Ctrl/⌘+K) backed by `/api/search`
+- Notifications, activity log, dashboard metrics
+- Markdown documents with autosave
+- Light/dark theme
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Configuration
 
-## Deploy on Vercel
+Everything works with zero configuration. To enable the AI assistant, set `AI_API_KEY`
+(and optionally `AI_API_BASE_URL`, `AI_MODEL`) in `.env.local` — see `.env.example`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev     # development server
+npm run build   # production build
+npm run start   # serve the production build
+npx tsc --noEmit    # type check
+npx eslint          # lint
+```
+
+## Data & reset
+
+All data lives in `~/.melouz-os/data/db.json` (outside the repo, so writes never trigger
+dev recompiles). Delete that file to reset the app. Set `MELOUZ_DATA_DIR` to store it
+somewhere else (e.g. inside the repo) if you prefer.
