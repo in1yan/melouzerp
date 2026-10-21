@@ -31,6 +31,7 @@ export function proxy(request: NextRequest) {
   const isProtected =
     pathname.startsWith("/dashboard") ||
     (pathname.startsWith("/api/") &&
+      pathname !== "/api/health" &&
       !pathname.startsWith("/api/auth/login") &&
       !pathname.startsWith("/api/auth/signup"));
 
