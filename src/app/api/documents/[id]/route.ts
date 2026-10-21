@@ -7,8 +7,8 @@ import { logActivity, userLite } from "@/lib/domain";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function loadDoc(id: string) {
-  const db = readDB();
+async function loadDoc(id: string) {
+  const db = await readDB();
   const doc = db.documents.find((d) => d.id === id);
   if (!doc) throw new ApiError(404, "Document not found");
   return { db, doc };
@@ -17,7 +17,7 @@ function loadDoc(id: string) {
 export async function GET(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { db, doc } = loadDoc(id);
+    const { db, doc } = await loadDoc(id);
     await requireMember(doc.workspace_id);
     return NextResponse.json({
       ...doc,
@@ -37,13 +37,13 @@ const patchSchema = z.object({
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { doc } = loadDoc(id);
+    const { doc } = await loadDoc(id);
     const { user, role } = await requireMember(doc.workspace_id);
     const body = await parseBody(req, patchSchema);
     if (!isSuperiorRole(role) && user.id !== doc.created_by) {
       throw new ApiError(403, "Only the document author, a lead, or an admin can edit it");
     }
-    const updated = mutate((db) => {
+    const updated = await mutate((db) => {
       const d = db.documents.find((x) => x.id === id)!;
       if (body.title !== undefined) d.title = body.title;
       if (body.content !== undefined) d.content = body.content;
@@ -60,12 +60,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
 export async function DELETE(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { doc } = loadDoc(id);
+    const { doc } = await loadDoc(id);
     const { user, role } = await requireMember(doc.workspace_id);
     if (!isSuperiorRole(role) && user.id !== doc.created_by) {
       throw new ApiError(403, "Only the document author, a lead, or an admin can delete it");
     }
-    mutate((db) => {
+    await mutate((db) => {
       db.documents = db.documents.filter((d) => d.id !== id);
       logActivity(db, {
         workspace_id: doc.workspace_id,

@@ -42,7 +42,7 @@ export async function GET(req: Request) {
     if (!workspaceId) throw new ApiError(400, "workspace query parameter is required");
     const { user: me, role: myRole } = await requireMember(workspaceId);
 
-    const db = readDB();
+    const db = await readDB();
     const members = db.workspace_members.filter((m) => m.workspace_id === workspaceId);
     const projectIds = new Set(db.projects.filter((p) => p.workspace_id === workspaceId).map((p) => p.id));
     const workspaceIssueIds = new Set(db.issues.filter((i) => projectIds.has(i.project_id)).map((i) => i.id));

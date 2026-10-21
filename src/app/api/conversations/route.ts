@@ -3,9 +3,9 @@ import { z } from "zod";
 import { mutate, newId, nowISO, readDB } from "@/lib/store";
 import { handleApiError, parseBody, requireMember, requireUser, ApiError } from "@/lib/api";
 import { userLite } from "@/lib/domain";
-import type { Conversation, Message } from "@/lib/types";
+import type { Conversation, Message, DB } from "@/lib/types";
 
-function enrich(db: ReturnType<typeof readDB>, conv: Conversation, meId: string) {
+function enrich(db: DB, conv: Conversation, meId: string) {
   const otherIds = conv.participant_ids.filter((id) => id !== meId);
   const last = db.messages
     .filter((m) => m.conversation_id === conv.id)
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     const user = await requireUser();
     const url = new URL(req.url);
     const workspaceId = url.searchParams.get("workspace");
-    const db = readDB();
+    const db = await readDB();
     let convs = db.conversations.filter((c) => c.participant_ids.includes(user.id));
     if (workspaceId) convs = convs.filter((c) => c.workspace_id === workspaceId);
     const enriched = convs
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const { user } = await requireMember(body.workspace_id);
     if (body.user_id === user.id) throw new ApiError(400, "You cannot message yourself");
 
-    const db0 = readDB();
+    const db0 = await readDB();
     const target = db0.users.find((u) => u.id === body.user_id);
     if (!target) throw new ApiError(404, "That user does not exist");
     const targetMember = db0.workspace_members.some(
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
         c.participant_ids.includes(body.user_id)
     );
 
-    const result = mutate((db) => {
+    const result = await mutate((db) => {
       if (existing) return { conv: existing, created: false };
       const conv: Conversation = {
         id: newId("conv"),

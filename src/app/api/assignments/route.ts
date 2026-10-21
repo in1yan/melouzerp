@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     const issue = url.searchParams.get("issue");
     const mine = url.searchParams.get("mine");
     let wsId = workspace;
-    const db = readDB();
+    const db = await readDB();
     if (issue) {
       const iss = db.issues.find((i) => i.id === issue);
       if (!iss) throw new ApiError(404, "Issue not found");
@@ -46,7 +46,13 @@ export async function GET(req: Request) {
         project: proj ? { id: proj.id, name: proj.name, key: proj.key } : null,
         assignee: assignee ? { id: assignee.id, name: assignee.name, avatar_color: assignee.avatar_color } : null,
         assigner: assigner ? { id: assigner.id, name: assigner.name } : null,
-        attachments: atts,
+        attachments: atts.map((att) => ({
+          id: att.id,
+          filename: att.filename,
+          content_type: att.content_type,
+          size: att.size,
+          uploaded_at: att.uploaded_at,
+        })),
       };
     });
     return NextResponse.json(payload);

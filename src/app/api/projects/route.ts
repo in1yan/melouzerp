@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     const workspaceId = new URL(req.url).searchParams.get("workspace");
     if (!workspaceId) throw new ApiError(400, "workspace query parameter is required");
     const { role } = await requireMember(workspaceId);
-    const db = readDB();
+    const db = await readDB();
     const projects = db.projects
       .filter((p) => p.workspace_id === workspaceId)
       .map((p) => {
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const body = await parseBody(req, createSchema);
     const { user } = await requireMember(body.workspace_id);
 
-    const project = mutate((db) => {
+    const project = await mutate((db) => {
       const derived = body.name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase() || "PRJ";
       const key = ensureProjectKey(db, body.workspace_id, body.key ?? derived);
       if (key.length < 2) throw new ApiError(400, "Could not derive a project key; provide one explicitly");

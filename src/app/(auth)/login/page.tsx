@@ -9,13 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, ApiClientError } from "@/lib/client";
 
+function safeNext(raw: string | null): string {
+  if (raw && raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")) return raw;
+  return "/dashboard";
+}
+
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const search = useSearchParams();
-  const next = search.get("next") || "/dashboard";
+  const next = safeNext(search.get("next"));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

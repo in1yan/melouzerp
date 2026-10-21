@@ -7,8 +7,8 @@ import { logActivity, notify, issueKey, userLite } from "@/lib/domain";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function loadContext(issueId: string) {
-  const db = readDB();
+async function loadContext(issueId: string) {
+  const db = await readDB();
   const issue = db.issues.find((i) => i.id === issueId);
   if (!issue) throw new ApiError(404, "Issue not found");
   const project = db.projects.find((p) => p.id === issue.project_id);
@@ -19,7 +19,7 @@ function loadContext(issueId: string) {
 export async function GET(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { db, project } = loadContext(id);
+    const { db, project } = await loadContext(id);
     await requireMember(project.workspace_id);
     const comments = db.comments
       .filter((c) => c.issue_id === id)
@@ -38,11 +38,11 @@ const createSchema = z.object({
 export async function POST(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { issue, project } = loadContext(id);
+    const { issue, project } = await loadContext(id);
     const { user } = await requireMember(project.workspace_id);
     const body = await parseBody(req, createSchema);
 
-    const comment = mutate((db) => {
+    const comment = await mutate((db) => {
       const cid = newId("cmt");
       db.comments.push({
         id: cid,
@@ -75,7 +75,7 @@ export async function POST(req: Request, ctx: Ctx) {
       return db.comments.find((c) => c.id === cid)!;
     });
 
-    return NextResponse.json({ ...comment, user: userLite(readDB(), comment.user_id) }, { status: 201 });
+    return NextResponse.json({ ...comment, user: userLite(await readDB(), comment.user_id) }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
   }
@@ -84,17 +84,17 @@ export async function POST(req: Request, ctx: Ctx) {
 export async function DELETE(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { project } = loadContext(id);
+    const { project } = await loadContext(id);
     const { user, role } = await requireMember(project.workspace_id);
     const commentId = new URL(req.url).searchParams.get("comment_id");
     if (!commentId) throw new ApiError(400, "comment_id is required");
-    const db = readDB();
+    const db = await readDB();
     const comment = db.comments.find((c) => c.id === commentId && c.issue_id === id);
     if (!comment) throw new ApiError(404, "Comment not found");
     if (comment.user_id !== user.id && !isSuperiorRole(role)) {
       throw new ApiError(403, "You can only delete your own comments");
     }
-    mutate((db2) => {
+    await mutate((db2) => {
       db2.comments = db2.comments.filter((c) => c.id !== commentId);
     });
     return NextResponse.json({ ok: true });

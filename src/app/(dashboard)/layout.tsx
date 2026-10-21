@@ -6,7 +6,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PendingApproval } from "@/components/shared/pending-approval";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  ensureBootstrap();
+  await ensureBootstrap();
   const jar = await cookies();
   const user = await getSessionUser();
   if (!user) {
@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (user.approval_status === "rejected") {
     return <PendingApproval user={user} rejected />;
   }
-  const workspaces = getUserWorkspaces(user.id);
+  const workspaces = await getUserWorkspaces(user.id);
   const activeCookie = jar.get("melouz.activeWorkspace")?.value;
   const initialActiveId =
     activeCookie && workspaces.some((w) => w.id === activeCookie)

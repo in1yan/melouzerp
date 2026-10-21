@@ -5,7 +5,7 @@ import { getUserWorkspaces } from "@/lib/auth";
 export async function GET() {
   try {
     const user = await requireUser();
-    return NextResponse.json({ user, workspaces: getUserWorkspaces(user.id) });
+    return NextResponse.json({ user, workspaces: await getUserWorkspaces(user.id) });
   } catch (err) {
     return handleApiError(err);
   }

@@ -8,7 +8,7 @@ import { logActivity, slugify, ensureWorkspaceSlug } from "@/lib/domain";
 export async function GET() {
   try {
     const user = await requireUser();
-    return NextResponse.json(getUserWorkspaces(user.id));
+    return NextResponse.json(await getUserWorkspaces(user.id));
   } catch (err) {
     return handleApiError(err);
   }
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   try {
     const user = await requireUser();
     const body = await parseBody(req, createSchema);
-    const workspace = mutate((db) => {
+    const workspace = await mutate((db) => {
       const wsId = newId("ws");
       const baseSlug = slugify(body.slug || body.name);
       db.workspaces.push({

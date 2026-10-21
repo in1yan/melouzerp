@@ -6,7 +6,7 @@ import { requireUser, handleApiError, parseBody } from "@/lib/api";
 export async function GET() {
   try {
     const user = await requireUser();
-    const db = readDB();
+    const db = await readDB();
     const notifications = db.notifications
       .filter((n) => n.user_id === user.id)
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
@@ -32,7 +32,7 @@ export async function PATCH(req: Request) {
     if (!body.all && (!body.ids || body.ids.length === 0)) {
       return NextResponse.json({ ok: true });
     }
-    mutate((db) => {
+    await mutate((db) => {
       for (const n of db.notifications) {
         if (n.user_id !== user.id) continue;
         if (body.all) n.read = true;

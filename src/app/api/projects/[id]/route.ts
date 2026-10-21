@@ -4,10 +4,12 @@ import { mutate, nowISO, readDB } from "@/lib/store";
 import { requireMember, handleApiError, parseBody, ApiError } from "@/lib/api";
 import { isSuperiorRole } from "@/lib/auth";
 import { logActivity, ensureProjectKey } from "@/lib/domain";
+import { deleteAttachmentBlobs } from "@/lib/attachments";
+import type { DB } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function findProjectOrFail(db: ReturnType<typeof readDB>, id: string) {
+function findProjectOrFail(db: DB, id: string) {
   const project = db.projects.find((p) => p.id === id);
   if (!project) throw new ApiError(404, "Project not found");
   return project;
@@ -16,7 +18,7 @@ function findProjectOrFail(db: ReturnType<typeof readDB>, id: string) {
 export async function GET(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const db = readDB();
+    const db = await readDB();
     const project = findProjectOrFail(db, id);
     await requireMember(project.workspace_id);
     const issues = db.issues.filter((i) => i.project_id === id);
@@ -57,12 +59,12 @@ const patchSchema = z.object({
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const db = readDB();
+    const db = await readDB();
     const project = findProjectOrFail(db, id);
     const { user } = await requireMember(project.workspace_id);
     const body = await parseBody(req, patchSchema);
 
-    const updated = mutate((db2) => {
+    const updated = await mutate((db2) => {
       const p = db2.projects.find((x) => x.id === id)!;
       if (body.key && body.key !== p.key) {
         if (db2.projects.some((x) => x.workspace_id === p.workspace_id && x.key === body.key && x.id !== id)) {
@@ -94,16 +96,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
 export async function DELETE(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const db = readDB();
+    const db = await readDB();
     const project = findProjectOrFail(db, id);
     const { user, role } = await requireMember(project.workspace_id);
     if (!isSuperiorRole(role) && project.lead_id !== user.id) {
       throw new ApiError(403, "Only workspace admins, leads, or the project lead can delete a project");
     }
-    mutate((db2) => {
+    const blobPathnames = await mutate((db2) => {
       const issueIds = db2.issues.filter((i) => i.project_id === id).map((i) => i.id);
+      const assignmentIds = db2.issue_assignments
+        .filter((a) => issueIds.includes(a.issue_id))
+        .map((a) => a.id);
+      const removed = db2.submission_attachments.filter((att) =>
+        assignmentIds.includes(att.assignment_id)
+      );
       db2.issues = db2.issues.filter((i) => i.project_id !== id);
       db2.comments = db2.comments.filter((c) => !issueIds.includes(c.issue_id));
+      db2.issue_assignments = db2.issue_assignments.filter((a) => !assignmentIds.includes(a.id));
+      db2.submission_attachments = db2.submission_attachments.filter(
+        (att) => !assignmentIds.includes(att.assignment_id)
+      );
       db2.projects = db2.projects.filter((p) => p.id !== id);
       logActivity(db2, {
         workspace_id: project.workspace_id,
@@ -113,7 +125,9 @@ export async function DELETE(_req: Request, ctx: Ctx) {
         entity_id: id,
         summary: `${user.name} deleted project "${project.name}"`,
       });
+      return removed.map((att) => att.blob_pathname);
     });
+    await deleteAttachmentBlobs(blobPathnames);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

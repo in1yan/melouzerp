@@ -78,6 +78,6 @@ export function ensureProjectKey(db: DB, workspaceId: string, base: string, excl
   return candidate;
 }
 
-export function getDb() {
+export async function getDb() {
   return readDB();
 }

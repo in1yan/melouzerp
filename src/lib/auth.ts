@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { promisify } from "util";
 import { cookies } from "next/headers";
 import { readDB, mutate, nowISO } from "./store";
 import type { Role, User, Workspace } from "./types";
@@ -6,28 +7,40 @@ import type { Role, User, Workspace } from "./types";
 export const SESSION_COOKIE = "melouz_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
-export function hashPassword(password: string): string {
+const scryptAsync = promisify(crypto.scrypt) as (
+  password: string,
+  salt: string,
+  keylen: number
+) => Promise<Buffer>;
+
+export function hashSessionToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.randomBytes(16).toString("hex");
-  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  const hash = (await scryptAsync(password, salt, 64)).toString("hex");
   return `${salt}:${hash}`;
 }
 
-export function verifyPassword(password: string, stored: string): boolean {
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const [salt, hash] = stored.split(":");
   if (!salt || !hash) return false;
-  const candidate = crypto.scryptSync(password, salt, 64);
   const expected = Buffer.from(hash, "hex");
+  if (expected.length !== 64) return false;
+  const candidate = await scryptAsync(password, salt, 64);
   if (candidate.length !== expected.length) return false;
   return crypto.timingSafeEqual(candidate, expected);
 }
 
-export function createSession(userId: string): string {
+export async function createSession(userId: string): Promise<string> {
   const token = crypto.randomBytes(32).toString("base64url");
-  mutate((db) => {
+  const tokenHash = hashSessionToken(token);
+  await mutate((db) => {
     const now = Date.now();
     db.sessions = db.sessions.filter((s) => new Date(s.expires_at).getTime() > now);
     db.sessions.push({
-      token,
+      token_hash: tokenHash,
       user_id: userId,
       created_at: nowISO(),
       expires_at: new Date(now + SESSION_TTL_MS).toISOString(),
@@ -41,6 +54,7 @@ export async function setSessionCookie(token: string): Promise<void> {
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: SESSION_TTL_MS / 1000,
   });
@@ -55,8 +69,9 @@ export async function getSessionUser(): Promise<User | null> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const db = readDB();
-  const session = db.sessions.find((s) => s.token === token);
+  const tokenHash = hashSessionToken(token);
+  const db = await readDB();
+  const session = db.sessions.find((s) => s.token_hash === tokenHash);
   if (!session) return null;
   if (new Date(session.expires_at).getTime() < Date.now()) return null;
   const user = db.users.find((u) => u.id === session.user_id);
@@ -64,8 +79,8 @@ export async function getSessionUser(): Promise<User | null> {
   return user;
 }
 
-export function getUserWorkspaces(userId: string) {
-  const db = readDB();
+export async function getUserWorkspaces(userId: string) {
+  const db = await readDB();
   return db.workspace_members
     .filter((m) => m.user_id === userId)
     .map((m) => {
@@ -86,16 +101,21 @@ export function getUserWorkspaces(userId: string) {
     .filter((x): x is NonNullable<typeof x> => x !== null);
 }
 
-export function getMembership(workspaceId: string, userId: string): { role: Role; workspace: Workspace } | null {
-  const db = readDB();
-  const member = db.workspace_members.find((m) => m.workspace_id === workspaceId && m.user_id === userId);
+export async function getMembership(
+  workspaceId: string,
+  userId: string
+): Promise<{ role: Role; workspace: Workspace } | null> {
+  const db = await readDB();
+  const member = db.workspace_members.find(
+    (m) => m.workspace_id === workspaceId && m.user_id === userId
+  );
   if (!member) return null;
   const ws = db.workspaces.find((w) => w.id === workspaceId);
   if (!ws) return null;
   return { role: member.role, workspace: ws };
 }
 
-export function isAdminRole(role: Role): boolean {
+export function isAdminRole(role: Role): role is "admin" | "owner" {
   return role === "admin" || role === "owner";
 }
 
@@ -107,8 +127,8 @@ export function isSuperiorRole(role: Role | undefined | null): boolean {
   return role === "lead" || role === "admin" || role === "owner";
 }
 
-export function findCompanyWorkspace() {
-  const db = readDB();
+export async function findCompanyWorkspace() {
+  const db = await readDB();
   const company = db.workspaces.find((w) => w.is_company) ?? db.workspaces[0];
   return company ?? null;
 }

@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 
     let scopeWorkspace = workspaceId;
     if (!scopeWorkspace && projectId) {
-      const db0 = readDB();
+      const db0 = await readDB();
       const p = db0.projects.find((x) => x.id === projectId);
       if (!p) throw new ApiError(404, "Project not found");
       scopeWorkspace = p.workspace_id;
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     if (!scopeWorkspace) throw new ApiError(400, "workspace or project query parameter is required");
     await requireMember(scopeWorkspace);
 
-    const db = readDB();
+    const db = await readDB();
     let issues = db.issues.filter((i) => {
       const project = db.projects.find((p) => p.id === i.project_id);
       return project && project.workspace_id === scopeWorkspace;
@@ -82,7 +82,7 @@ const createSchema = z.object({
 export async function POST(req: Request) {
   try {
     const body = await parseBody(req, createSchema);
-    const db = readDB();
+    const db = await readDB();
     const project = db.projects.find((p) => p.id === body.project_id);
     if (!project) throw new ApiError(404, "Project not found");
     const { user } = await requireMember(project.workspace_id);
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
       if (!parent || parent.project_id !== body.project_id) throw new ApiError(400, "Invalid parent issue");
     }
 
-    const issue = mutate((db2) => {
+    const issue = await mutate((db2) => {
       const siblings = db2.issues.filter((i) => i.project_id === body.project_id);
       const nextNumber = siblings.reduce((max, i) => Math.max(max, i.issue_number), 0) + 1;
       const maxOrder = siblings.reduce((max, i) => Math.max(max, i.order), 0);

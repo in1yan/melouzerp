@@ -16,8 +16,13 @@ const setupHint =
   "The AI assistant is not configured. Set AI_API_KEY in .env.local (and optionally AI_API_BASE_URL, AI_MODEL), then restart the server.";
 
 export async function GET() {
-  const { key, model } = aiConfig();
-  return NextResponse.json({ configured: Boolean(key), model: key ? model : null, hint: key ? null : setupHint });
+  try {
+    await requireUser();
+    const { key, model } = aiConfig();
+    return NextResponse.json({ configured: Boolean(key), model: key ? model : null, hint: key ? null : setupHint });
+  } catch (err) {
+    return handleApiError(err);
+  }
 }
 
 const messageSchema = z.object({
@@ -29,8 +34,7 @@ const messageSchema = z.object({
     .optional(),
 });
 
-function buildWorkspaceContext(workspaceId: string, userId: string): string {
-  const db = readDB();
+function buildWorkspaceContext(db: Awaited<ReturnType<typeof readDB>>, workspaceId: string, userId: string): string {
   const ws = db.workspaces.find((w) => w.id === workspaceId);
   if (!ws) return "";
   const projects = db.projects.filter((p) => p.workspace_id === workspaceId);
@@ -62,11 +66,13 @@ export async function POST(req: Request) {
     const body = await parseBody(req, messageSchema);
     const { key, baseUrl, model } = aiConfig();
     if (!key) throw new ApiError(503, setupHint);
-    if (body.workspace_id && !getMembership(body.workspace_id, user.id)) {
+    if (body.workspace_id && !(await getMembership(body.workspace_id, user.id))) {
       throw new ApiError(403, "You are not a member of this workspace");
     }
 
-    const context = body.workspace_id ? buildWorkspaceContext(body.workspace_id, user.id) : "";
+    const context = body.workspace_id
+      ? buildWorkspaceContext(await readDB(), body.workspace_id, user.id)
+      : "";
     const system = [
       "You are the built-in assistant for Melouz OS, a project management and ERP workspace.",
       "Answer concisely and practically. Use the live workspace context below when relevant; do not invent data that is not there.",

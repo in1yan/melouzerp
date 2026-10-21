@@ -16,7 +16,7 @@ const assignSchema = z.object({
 export async function POST(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const db0 = readDB();
+    const db0 = await readDB();
     const issue = db0.issues.find((i) => i.id === id);
     if (!issue) throw new ApiError(404, "Issue not found");
     const project = db0.projects.find((p) => p.id === issue.project_id);
@@ -27,7 +27,7 @@ export async function POST(req: Request, ctx: Ctx) {
     }
     const body = await parseBody(req, assignSchema);
 
-    const result = mutate((db) => {
+    const result = await mutate((db) => {
       const assigned: string[] = [];
       for (const uid of body.user_ids) {
         const isMember = db.workspace_members.some((m) => m.workspace_id === project.workspace_id && m.user_id === uid);

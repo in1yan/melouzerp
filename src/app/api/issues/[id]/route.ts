@@ -4,11 +4,12 @@ import { mutate, nowISO, readDB } from "@/lib/store";
 import { requireMember, handleApiError, parseBody, ApiError } from "@/lib/api";
 import { isAdminRole } from "@/lib/auth";
 import { logActivity, notify, issueKey, userLite } from "@/lib/domain";
+import { deleteAttachmentBlobs } from "@/lib/attachments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function loadIssue(id: string) {
-  const db = readDB();
+async function loadIssue(id: string) {
+  const db = await readDB();
   const issue = db.issues.find((i) => i.id === id);
   if (!issue) throw new ApiError(404, "Issue not found");
   const project = db.projects.find((p) => p.id === issue.project_id);
@@ -19,7 +20,7 @@ function loadIssue(id: string) {
 export async function GET(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { db, issue, project } = loadIssue(id);
+    const { db, issue, project } = await loadIssue(id);
     await requireMember(project.workspace_id);
     const children = db.issues
       .filter((i) => i.parent_id === id)
@@ -43,7 +44,15 @@ export async function GET(_req: Request, ctx: Ctx) {
           ...a,
           assignee: u ? { id: u.id, name: u.name, avatar_color: u.avatar_color } : null,
           assigner: ab ? { id: ab.id, name: ab.name } : null,
-          attachments: db.submission_attachments.filter((att) => att.assignment_id === a.id),
+          attachments: db.submission_attachments
+            .filter((att) => att.assignment_id === a.id)
+            .map((att) => ({
+              id: att.id,
+              filename: att.filename,
+              content_type: att.content_type,
+              size: att.size,
+              uploaded_at: att.uploaded_at,
+            })),
         };
       });
     return NextResponse.json({
@@ -78,12 +87,12 @@ const patchSchema = z.object({
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { issue, project } = loadIssue(id);
+    const { issue, project } = await loadIssue(id);
     const { user } = await requireMember(project.workspace_id);
     const body = await parseBody(req, patchSchema);
 
     if (body.assignee_id) {
-      const db = readDB();
+      const db = await readDB();
       const isMember = db.workspace_members.some(
         (m) => m.workspace_id === project.workspace_id && m.user_id === body.assignee_id
       );
@@ -91,7 +100,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     const changes: string[] = [];
-    const updated = mutate((db) => {
+    const updated = await mutate((db) => {
       const i = db.issues.find((x) => x.id === id)!;
       if (body.title !== undefined && body.title !== i.title) { changes.push("title"); i.title = body.title; }
       if (body.description !== undefined && body.description !== i.description) { changes.push("description"); i.description = body.description; }
@@ -142,16 +151,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
 export async function DELETE(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { issue, project } = loadIssue(id);
+    const { issue, project } = await loadIssue(id);
     const { user, role } = await requireMember(project.workspace_id);
     if (!isAdminRole(role) && user.id !== issue.reporter_id) {
       throw new ApiError(403, "Only the person who created this issue or an admin can delete it");
     }
-    mutate((db) => {
+    const blobPathnames = await mutate((db) => {
       const childIds = db.issues.filter((i) => i.parent_id === id).map((i) => i.id);
       const allIds = [id, ...childIds];
+      const assignmentIds = db.issue_assignments
+        .filter((a) => allIds.includes(a.issue_id))
+        .map((a) => a.id);
+      const removedAttachments = db.submission_attachments.filter((att) =>
+        assignmentIds.includes(att.assignment_id)
+      );
       db.issues = db.issues.filter((i) => !allIds.includes(i.id));
       db.comments = db.comments.filter((c) => !allIds.includes(c.issue_id));
+      db.issue_assignments = db.issue_assignments.filter((a) => !assignmentIds.includes(a.id));
+      db.submission_attachments = db.submission_attachments.filter(
+        (att) => !assignmentIds.includes(att.assignment_id)
+      );
       logActivity(db, {
         workspace_id: project.workspace_id,
         user_id: user.id,
@@ -160,7 +179,9 @@ export async function DELETE(_req: Request, ctx: Ctx) {
         entity_id: id,
         summary: `${user.name} deleted ${issueKey(db, issue)} "${issue.title}"`,
       });
+      return removedAttachments.map((att) => att.blob_pathname);
     });
+    await deleteAttachmentBlobs(blobPathnames);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

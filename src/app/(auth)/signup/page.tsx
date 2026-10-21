@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,6 @@ function SignupForm() {
   const [requestedRole, setRequestedRole] = useState<"lead" | "employee">("employee");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const search = useSearchParams();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +24,8 @@ function SignupForm() {
         method: "POST",
         body: { name, email, password, requested_role: requestedRole },
       });
-      router.push(search.get("next") || "/dashboard");
+      toast.success("Request submitted. An admin will review your access.");
+      router.push("/login");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof ApiClientError ? err.message : "Sign up failed");

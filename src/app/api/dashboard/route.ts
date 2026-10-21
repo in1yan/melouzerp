@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     if (!workspaceId) throw new ApiError(400, "workspace query parameter is required");
     const { user, role } = await requireMember(workspaceId);
 
-    const db = readDB();
+    const db = await readDB();
     const projectIds = db.projects.filter((p) => p.workspace_id === workspaceId).map((p) => p.id);
     const issues = db.issues.filter((i) => projectIds.includes(i.project_id));
     const today = new Date().toISOString().slice(0, 10);

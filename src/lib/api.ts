@@ -23,7 +23,7 @@ export async function requireUser(): Promise<User> {
 
 export async function requireMember(workspaceId: string) {
   const user = await requireUser();
-  const membership = getMembership(workspaceId, user.id);
+  const membership = await getMembership(workspaceId, user.id);
   if (!membership) throw new ApiError(403, "You are not a member of this workspace");
   return { user, ...membership };
 }

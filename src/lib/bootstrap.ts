@@ -1,18 +1,43 @@
+import crypto from "crypto";
 import { mutate, newId, nowISO } from "./store";
 import { hashPassword } from "./auth";
 import type { User } from "./types";
 
 export const COMPANY_WORKSPACE_NAME = process.env.COMPANY_WORKSPACE_NAME || "Melouz Company";
-export const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL || "admin@melouz.local";
-export const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || "admin12345";
+export const DEFAULT_ADMIN_EMAIL = (process.env.DEFAULT_ADMIN_EMAIL || "admin@melouz.local")
+  .trim()
+  .toLowerCase();
 
-let bootstrapped = false;
+let bootstrapAttempted = false;
 
-export function ensureBootstrap(): void {
-  if (bootstrapped) return;
-  bootstrapped = true;
+function resolveAdminPassword(): { password: string; generated: boolean } {
+  const fromEnv = process.env.DEFAULT_ADMIN_PASSWORD?.trim();
+  if (fromEnv) return { password: fromEnv, generated: false };
+  if (process.env.NODE_ENV === "production") {
+    // Never ship a well-known default to production: generate a strong random
+    // password and surface it once in the server logs.
+    return { password: crypto.randomBytes(18).toString("base64url"), generated: true };
+  }
+  return { password: "admin12345", generated: false };
+}
+
+export async function ensureBootstrap(): Promise<void> {
+  if (bootstrapAttempted) return;
+  bootstrapAttempted = true;
   try {
-    mutate((db) => {
+    // Precompute the hash outside mutate(): the mutate callback is sync and
+    // password hashing is async.
+    const { password, generated } = resolveAdminPassword();
+    const passwordHash = await hashPassword(password);
+    if (generated) {
+      console.log(
+        `\n[bootstrap] DEFAULT_ADMIN_PASSWORD is not set. A one-time admin password was generated:\n` +
+          `            email:    ${DEFAULT_ADMIN_EMAIL}\n` +
+          `            password: ${password}\n` +
+          `            Store it now — set DEFAULT_ADMIN_PASSWORD in your environment to control it.\n`
+      );
+    }
+    await mutate((db) => {
       let company = db.workspaces.find((w) => w.is_company);
       if (!company) {
         const existing = db.workspaces[0];
@@ -53,7 +78,7 @@ export function ensureBootstrap(): void {
         db.users.push(admin);
         db.password_credentials.push({
           user_id: adminId,
-          password_hash: hashPassword(DEFAULT_ADMIN_PASSWORD),
+          password_hash: passwordHash,
         });
       }
 
@@ -81,7 +106,7 @@ export function ensureBootstrap(): void {
       }
     });
   } catch (err) {
-    bootstrapped = false;
+    bootstrapAttempted = false;
     console.error("[bootstrap]", err);
   }
 }

@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     const workspaceId = new URL(req.url).searchParams.get("workspace");
     if (!workspaceId) throw new ApiError(400, "workspace query parameter is required");
     await requireMember(workspaceId);
-    const db = readDB();
+    const db = await readDB();
     const docs = db.documents
       .filter((d) => d.workspace_id === workspaceId)
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   try {
     const body = await parseBody(req, createSchema);
     const { user } = await requireMember(body.workspace_id);
-    const doc = mutate((db) => {
+    const doc = await mutate((db) => {
       const id = newId("doc");
       const title = body.title?.trim() || "Untitled";
       db.documents.push({

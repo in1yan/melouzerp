@@ -23,10 +23,18 @@ export interface User {
 }
 
 export interface Session {
-  token: string;
+  token_hash: string;
   user_id: string;
   created_at: string;
   expires_at: string;
+}
+
+export interface LoginAttempt {
+  key: string;
+  failures: number;
+  first_failed_at: string;
+  last_failed_at: string;
+  locked_until: string | null;
 }
 
 export interface Workspace {
@@ -147,7 +155,8 @@ export interface SubmissionAttachment {
   filename: string;
   content_type: string;
   size: number;
-  data_url: string;
+  data_url: string | null;
+  blob_pathname: string | null;
   uploaded_by: string;
   uploaded_at: string;
 }
@@ -194,6 +203,7 @@ export interface DB {
   users: User[];
   password_credentials: { user_id: string; password_hash: string }[];
   sessions: Session[];
+  login_attempts: LoginAttempt[];
   workspaces: Workspace[];
   workspace_members: WorkspaceMember[];
   projects: Project[];

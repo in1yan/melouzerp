@@ -11,7 +11,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
     await requireMember(id);
-    const db = readDB();
+    const db = await readDB();
     const members = db.workspace_members
       .filter((m) => m.workspace_id === id)
       .map((m) => {
@@ -39,10 +39,15 @@ const inviteSchema = z.object({
 export async function POST(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { user: admin } = await requireAdmin(id);
+    const { user: admin, role: adminRole } = await requireAdmin(id);
     const body = await parseBody(req, inviteSchema);
+    // Only the workspace owner may grant the admin role; admins can invite
+    // leads and employees. This limits mid-level privilege escalation.
+    if (body.role === "admin" && adminRole !== "owner") {
+      throw new ApiError(403, "Only the workspace owner can grant the admin role");
+    }
 
-    const result = mutate((db) => {
+    const result = await mutate((db) => {
       const target = db.users.find((u) => u.email === body.email);
       if (!target) {
         throw new ApiError(
@@ -95,10 +100,13 @@ const patchSchema = z.object({
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const { user: admin } = await requireAdmin(id);
+    const { user: admin, role: adminRole } = await requireAdmin(id);
     const body = await parseBody(req, patchSchema);
+    if (body.role === "admin" && adminRole !== "owner") {
+      throw new ApiError(403, "Only the workspace owner can grant the admin role");
+    }
 
-    mutate((db) => {
+    await mutate((db) => {
       const member = db.workspace_members.find((m) => m.id === body.member_id && m.workspace_id === id);
       if (!member) throw new ApiError(404, "Member not found");
       if (member.role === "owner") throw new ApiError(400, "The owner's role cannot be changed");
@@ -132,7 +140,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
     const member_id = new URL(req.url).searchParams.get("member_id");
     if (!member_id) throw new ApiError(400, "member_id is required");
 
-    mutate((db) => {
+    await mutate((db) => {
       const member = db.workspace_members.find((m) => m.id === member_id && m.workspace_id === id);
       if (!member) throw new ApiError(404, "Member not found");
       const isSelf = member.user_id === user.id;

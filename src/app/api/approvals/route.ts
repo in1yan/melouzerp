@@ -1,36 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { mutate, newId, nowISO, readDB } from "@/lib/store";
-import { handleApiError, parseBody, requireUser, ApiError } from "@/lib/api";
-import { isAdminRole } from "@/lib/auth";
+import { handleApiError, parseBody, ApiError } from "@/lib/api";
 import { logActivity, notify } from "@/lib/domain";
-import { ensureBootstrap } from "@/lib/bootstrap";
-
-async function requireAppAdmin() {
-  ensureBootstrap();
-  const user = await requireUser();
-  const db = readDB();
-  const adminMemberships = db.workspace_members.filter(
-    (m) => m.user_id === user.id && (m.role === "admin" || m.role === "owner")
-  );
-  if (adminMemberships.length === 0) {
-    throw new ApiError(403, "Admin permissions required");
-  }
-  const company =
-    db.workspaces.find((w) => w.is_company) ??
-    db.workspaces.find((w) => adminMemberships.some((m) => m.workspace_id === w.id));
-  if (!company) throw new ApiError(400, "No workspace available");
-  const membership = adminMemberships.find((m) => m.workspace_id === company.id);
-  if (!membership || !isAdminRole(membership.role)) {
-    throw new ApiError(403, "You must be an admin of the company workspace");
-  }
-  return { user, company, role: membership.role };
-}
+import { requireAppAdmin } from "@/lib/admin";
 
 export async function GET() {
   try {
     const { company } = await requireAppAdmin();
-    const db = readDB();
+    const db = await readDB();
     const pending = db.users
       .filter((u) => u.approval_status === "pending")
       .map((u) => ({
@@ -74,7 +52,7 @@ export async function PATCH(req: Request) {
     const { user: admin, company } = await requireAppAdmin();
     const body = await parseBody(req, actionSchema);
 
-    const updated = mutate((db) => {
+    const updated = await mutate((db) => {
       const target = db.users.find((u) => u.id === body.user_id);
       if (!target) throw new ApiError(404, "User not found");
       if (target.approval_status !== "pending") throw new ApiError(400, "This request was already handled");

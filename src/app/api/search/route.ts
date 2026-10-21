@@ -11,8 +11,8 @@ export async function GET(req: Request) {
     if (q.length < 1) return NextResponse.json({ projects: [], issues: [], documents: [] });
     if (q.length > 100) throw new ApiError(400, "Search query too long");
 
-    const wsIds = getUserWorkspaces(user.id).map((w) => w.id);
-    const db = readDB();
+    const wsIds = (await getUserWorkspaces(user.id)).map((w) => w.id);
+    const db = await readDB();
 
     const projects = db.projects
       .filter((p) => wsIds.includes(p.workspace_id))

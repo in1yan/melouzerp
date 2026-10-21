@@ -1,10 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const SESSION_COOKIE = "melouz_session";
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+
+  // CSRF hardening: mutations on same-origin APIs must not be callable from
+  // another site. Cross-origin form/fetch calls always send an Origin header
+  // that differs from ours; same-origin navigations and API clients either
+  // omit Origin or match it.
+  if (pathname.startsWith("/api/") && MUTATING_METHODS.has(request.method)) {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      const host = request.headers.get("host");
+      let originHost: string | null = null;
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        originHost = null;
+      }
+      if (!originHost || (host && originHost !== host)) {
+        return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
+      }
+    }
+  }
 
   const isAuthPage = pathname === "/login" || pathname === "/signup";
   const isProtected =

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { mutate, newId, nowISO, readDB } from "@/lib/store";
 import { requireMember, handleApiError, parseBody, ApiError } from "@/lib/api";
+import { isAdminRole } from "@/lib/auth";
 import { logActivity, notify } from "@/lib/domain";
 
 const eventSchema = z.object({
@@ -24,9 +25,13 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const workspace = url.searchParams.get("workspace");
     if (!workspace) throw new ApiError(400, "workspace is required");
-    await requireMember(workspace);
-    const db = readDB();
-    const events = db.calendar_events.filter((e) => e.workspace_id === workspace).sort((a,b)=>a.start_at.localeCompare(b.start_at));
+    const { user, role } = await requireMember(workspace);
+    const db = await readDB();
+    const canSeePrivate = isAdminRole(role);
+    const events = db.calendar_events
+      .filter((e) => e.workspace_id === workspace)
+      .filter((e) => e.visibility !== "private" || e.organizer_id === user.id || canSeePrivate)
+      .sort((a, b) => a.start_at.localeCompare(b.start_at));
     return NextResponse.json(events);
   } catch (err) {
     return handleApiError(err);
@@ -42,12 +47,12 @@ export async function POST(req: Request) {
     const { user } = await requireMember(workspace);
     if (new Date(body.end_at) < new Date(body.start_at)) throw new ApiError(400, "end_at must be after start_at");
     if (body.attendees && body.attendees.length) {
-      const db = readDB();
+      const db = await readDB();
       for (const id of body.attendees) {
         if (!db.workspace_members.some((m)=>m.workspace_id===workspace && m.user_id===id)) throw new ApiError(400, "Some attendees are not workspace members");
       }
     }
-    const ev = mutate((db) => {
+    const ev = await mutate((db) => {
       const id = newId("ev");
       db.calendar_events.push({
         id,

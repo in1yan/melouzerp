@@ -15,7 +15,6 @@ export interface SubmissionAttachment {
   filename: string;
   content_type: string;
   size: number;
-  data_url: string;
 }
 
 export interface AssignmentItem {
@@ -198,10 +197,8 @@ export function AssignmentPanel({
                 {a.attachments.map((att) => (
                   <a
                     key={att.id}
-                    href={att.data_url}
+                    href={`/api/attachments/${att.id}`}
                     download={att.filename}
-                    target="_blank"
-                    rel="noreferrer"
                     className="inline-flex items-center gap-1 rounded border bg-background px-1.5 py-0.5 text-[10px] hover:bg-accent"
                     title={`${att.filename} (${Math.round(att.size / 1024)} KB)`}
                   >

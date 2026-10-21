@@ -7,8 +7,8 @@ import type { Message } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function assertParticipant(convId: string, userId: string) {
-  const db = readDB();
+async function assertParticipant(convId: string, userId: string) {
+  const db = await readDB();
   const conv = db.conversations.find((c) => c.id === convId);
   if (!conv) throw new ApiError(404, "Conversation not found");
   if (!conv.participant_ids.includes(userId)) throw new ApiError(403, "You are not in this conversation");
@@ -19,8 +19,8 @@ export async function GET(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
     const user = await requireUser();
-    assertParticipant(id, user.id);
-    const db = readDB();
+    await assertParticipant(id, user.id);
+    const db = await readDB();
     const messages = db.messages
       .filter((m) => m.conversation_id === id)
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
@@ -28,7 +28,7 @@ export async function GET(req: Request, ctx: Ctx) {
 
     const markRead = new URL(req.url).searchParams.get("mark_read") === "1";
     if (markRead) {
-      mutate((d) => {
+      await mutate((d) => {
         for (const m of d.messages) {
           if (m.conversation_id === id && !m.read_by.includes(user.id)) m.read_by.push(user.id);
         }
@@ -46,10 +46,10 @@ export async function POST(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
     const user = await requireUser();
-    assertParticipant(id, user.id);
+    await assertParticipant(id, user.id);
     const input = await parseBody(req, sendSchema);
 
-    const message = mutate((db) => {
+    const message = await mutate((db) => {
       const msg: Message = {
         id: newId("msg"),
         conversation_id: id,
@@ -73,7 +73,7 @@ export async function POST(req: Request, ctx: Ctx) {
       return msg;
     });
 
-    const db = readDB();
+    const db = await readDB();
     return NextResponse.json({ ...message, sender: userLite(db, user.id) }, { status: 201 });
   } catch (err) {
     return handleApiError(err);

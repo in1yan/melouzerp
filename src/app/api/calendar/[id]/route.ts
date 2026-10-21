@@ -25,7 +25,7 @@ const patchSchema = z.object({
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const db0 = readDB();
+    const db0 = await readDB();
     const ev = db0.calendar_events.find((e) => e.id === id);
     if (!ev) throw new ApiError(404, "Event not found");
     const { user } = await requireMember(ev.workspace_id);
@@ -40,7 +40,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         if (!db0.workspace_members.some((m)=>m.workspace_id===ev.workspace_id && m.user_id===aid)) throw new ApiError(400, "Some attendees are not workspace members");
       }
     }
-    const updated = mutate((db) => {
+    const updated = await mutate((db) => {
       const e = db.calendar_events.find((x)=>x.id===id)!;
       if (body.title !== undefined) e.title = body.title;
       if (body.description !== undefined) e.description = body.description;
@@ -95,7 +95,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 export async function DELETE(_req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const db0 = readDB();
+    const db0 = await readDB();
     const ev = db0.calendar_events.find((e) => e.id === id);
     if (!ev) throw new ApiError(404, "Event not found");
     const { user } = await requireMember(ev.workspace_id);
@@ -103,7 +103,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       const mem = db0.workspace_members.find((m)=>m.workspace_id===ev.workspace_id && m.user_id===user.id);
       if (!isSuperiorRole(mem?.role)) throw new ApiError(403, "Only organizer, admins or leads can delete this event");
     }
-    mutate((db) => { db.calendar_events = db.calendar_events.filter((e)=>e.id!==id); });
+    await mutate((db) => { db.calendar_events = db.calendar_events.filter((e)=>e.id!==id); });
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);
