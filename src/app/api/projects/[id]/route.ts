@@ -61,8 +61,14 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const { id } = await ctx.params;
     const db = await readDB();
     const project = findProjectOrFail(db, id);
-    const { user } = await requireMember(project.workspace_id);
+    const { user, role } = await requireMember(project.workspace_id);
     const body = await parseBody(req, patchSchema);
+    if (body.lead_id !== undefined) {
+      if (!isSuperiorRole(role)) throw new ApiError(403, "Only workspace admins, leads, or owners can change the project lead");
+      if (body.lead_id && !db.workspace_members.some((m) => m.workspace_id === project.workspace_id && m.user_id === body.lead_id)) {
+        throw new ApiError(400, "Project lead must be a member of this workspace");
+      }
+    }
 
     const updated = await mutate((db2) => {
       const p = db2.projects.find((x) => x.id === id)!;

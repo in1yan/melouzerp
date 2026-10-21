@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { getSessionUser, getMembership, isAdminRole } from "./auth";
 import type { User } from "./types";
+import { StoreConsistencyError } from "./store";
 
 export class ApiError extends Error {
   status: number;
@@ -18,6 +19,7 @@ export function jsonError(status: number, message: string) {
 export async function requireUser(): Promise<User> {
   const user = await getSessionUser();
   if (!user) throw new ApiError(401, "Not authenticated");
+  if (user.approval_status !== "approved") throw new ApiError(403, "Account approval is required");
   return user;
 }
 
@@ -55,6 +57,7 @@ export async function parseBody<T>(req: Request, schema: ZodType<T>): Promise<T>
 
 export function handleApiError(err: unknown) {
   if (err instanceof ApiError) return jsonError(err.status, err.message);
+  if (err instanceof StoreConsistencyError) return jsonError(503, "Database is busy; please retry");
   console.error("[api]", err);
   return jsonError(500, "Internal server error");
 }

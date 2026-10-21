@@ -56,6 +56,25 @@ export interface WorkspaceMember {
   created_at: string;
 }
 
+export interface Team {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  lead_id: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMember {
+  id: string;
+  team_id: string;
+  user_id: string;
+  added_by: string;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   workspace_id: string;
@@ -122,7 +141,7 @@ export interface Activity {
   workspace_id: string;
   user_id: string | null;
   action: string;
-  entity_type: "workspace" | "project" | "issue" | "document" | "member" | "comment" | "calendar_event";
+  entity_type: "workspace" | "project" | "issue" | "document" | "member" | "team" | "comment" | "calendar_event";
   entity_id: string;
   summary: string;
   created_at: string;
@@ -206,6 +225,8 @@ export interface DB {
   login_attempts: LoginAttempt[];
   workspaces: Workspace[];
   workspace_members: WorkspaceMember[];
+  teams: Team[];
+  team_members: TeamMember[];
   projects: Project[];
   issues: Issue[];
   issue_assignments: IssueAssignment[];

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { useTheme } from "next-themes";
 import { Bell, LogOut, Menu, MessageSquare, Moon, Search, Settings, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/providers";
 import {
   DropdownMenu,
   DropdownMenuContent,

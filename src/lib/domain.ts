@@ -1,5 +1,6 @@
 import { newId, nowISO, readDB } from "./store";
 import type { Activity, DB, Issue, Notification, Project } from "./types";
+import { sendEmail } from "./mailer";
 
 export function logActivity(
   db: DB,
@@ -20,6 +21,21 @@ export function notify(db: DB, entry: Omit<Notification, "id" | "created_at" | "
   };
   db.notifications.unshift(notification);
   if (db.notifications.length > 500) db.notifications.length = 500;
+  const recipient = db.users.find((user) => user.id === notification.user_id);
+  if (recipient) {
+    queueMicrotask(() => {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+      void sendEmail({
+        to: recipient.email,
+        subject: notification.title,
+        text: `${notification.message}${
+          notification.link ? `\n\nOpen Melouz OS: ${appUrl ? `${appUrl}${notification.link}` : notification.link}` : ""
+        }`,
+      }).catch((error) => {
+        console.error("[mailer] notification delivery failed:", error);
+      });
+    });
+  }
   return notification;
 }
 

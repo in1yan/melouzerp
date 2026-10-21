@@ -117,11 +117,11 @@ async function connect(): Promise<MongoHandle> {
  * booting, so failures are logged instead of thrown.
  */
 async function ensureIndexes(db: Db): Promise<void> {
-  const unique = async (name: string, keys: Record<string, 1 | -1>) => {
+  const requiredUnique = async (name: string, keys: Record<string, 1 | -1>) => {
     try {
       await db.collection(name).createIndex(keys, { unique: true });
     } catch (err) {
-      console.warn(`[mongo] could not create unique index on ${name}:`, (err as Error).message);
+      throw new Error(`Required unique index failed on ${name}: ${(err as Error).message}`);
     }
   };
   const plain = async (name: string, keys: Record<string, 1 | -1>) => {
@@ -132,8 +132,10 @@ async function ensureIndexes(db: Db): Promise<void> {
     }
   };
 
-  await unique("users", { email: 1 });
-  await unique("workspace_members", { workspace_id: 1, user_id: 1 });
+  await requiredUnique("users", { email: 1 });
+  await requiredUnique("workspace_members", { workspace_id: 1, user_id: 1 });
+  await requiredUnique("team_members", { team_id: 1, user_id: 1 });
+  await requiredUnique("projects", { workspace_id: 1, key: 1 });
   await plain("projects", { workspace_id: 1 });
   await plain("issues", { project_id: 1 });
   await plain("issues", { assignee_id: 1 });
@@ -146,5 +148,7 @@ async function ensureIndexes(db: Db): Promise<void> {
   await plain("messages", { conversation_id: 1 });
   await plain("notifications", { user_id: 1 });
   await plain("activities", { workspace_id: 1 });
+  await plain("teams", { workspace_id: 1 });
+  await plain("team_members", { user_id: 1 });
   await plain("sessions", { user_id: 1 });
 }

@@ -17,6 +17,7 @@ const signupSchema = z.object({
 });
 
 function clientIp(req: Request): string {
+  if (process.env.TRUST_PROXY !== "1") return "unknown";
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();

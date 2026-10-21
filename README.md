@@ -84,6 +84,9 @@ leads; leads see their employees).
 | `MONGODB_CACHE_TTL_MS` | no | Read cache lifetime in ms (default `1000`) |
 | `AI_API_KEY` | no | Enables the AI assistant |
 | `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` | no | Seeded admin account |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | no | SMTP credentials for email notifications |
+| `SMTP_FROM` | no | Sender address; defaults to `SMTP_USER` |
+| `SMTP_SECURE` | no | Set to `1` for implicit TLS, typically with port `465` |
 
 See `.env.example` for the full list.
 

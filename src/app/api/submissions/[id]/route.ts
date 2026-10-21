@@ -4,7 +4,12 @@ import { mutate, nowISO, readDB } from "@/lib/store";
 import { requireUser, requireMember, handleApiError, parseBody, ApiError } from "@/lib/api";
 import { isSuperiorRole } from "@/lib/auth";
 import { issueKey, notify, logActivity } from "@/lib/domain";
-import { MAX_FILES_PER_SUBMISSION, prepareAttachment, storeAttachment } from "@/lib/attachments";
+import {
+  MAX_FILES_PER_SUBMISSION,
+  prepareAttachment,
+  storeAttachment,
+  deleteAttachmentFiles,
+} from "@/lib/attachments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -18,12 +23,16 @@ const submitSchema = z.object({
   submission_text: z.string().max(10000).optional(),
   files: z.array(fileSchema).max(MAX_FILES_PER_SUBMISSION).optional(),
 });
+const MAX_SUBMISSION_DATA_URL_BYTES = 14 * 1024 * 1024;
 
 export async function POST(req: Request, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
     const user = await requireUser();
     const body = await parseBody(req, submitSchema);
+    if ((body.files ?? []).reduce((sum, file) => sum + file.data_url.length, 0) > MAX_SUBMISSION_DATA_URL_BYTES) {
+      throw new ApiError(400, "Combined attachment size exceeds the 10 MB per-submission limit");
+    }
     const db0 = await readDB();
     const asn = db0.issue_assignments.find((a) => a.id === id && a.user_id === user.id);
     if (!asn) throw new ApiError(404, "Assignment not found");
@@ -76,17 +85,15 @@ export async function POST(req: Request, ctx: Ctx) {
       }
     });
 
-    // Persist files after the DB row is committed; a storage failure does not
-    // lose the submission itself (the user can resubmit with files).
-    for (const p of prepared) {
-      try {
-        const stored = await storeAttachment(p);
-        await mutate((db) => {
-          db.submission_attachments.push(stored);
-        });
-      } catch (err) {
-        console.error("[submissions] attachment store failed", err);
-      }
+    const stored: Awaited<ReturnType<typeof storeAttachment>>[] = [];
+    try {
+      for (const p of prepared) stored.push(await storeAttachment(p));
+      await mutate((db) => {
+        db.submission_attachments.push(...stored);
+      });
+    } catch {
+      await deleteAttachmentFiles(stored.map((a) => a.id));
+      throw new ApiError(502, "Submission saved, but attachments could not be stored. Please retry.");
     }
 
     return NextResponse.json({ ok: true, submitted_at: nowISO() });

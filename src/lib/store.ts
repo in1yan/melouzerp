@@ -39,6 +39,8 @@ const SPECS: Record<keyof DB, CollectionSpec> = {
   login_attempts: { name: "login_attempts", key: "key", newestFirst: false },
   workspaces: { name: "workspaces", key: "id", newestFirst: false },
   workspace_members: { name: "workspace_members", key: "id", newestFirst: false },
+  teams: { name: "teams", key: "id", newestFirst: false },
+  team_members: { name: "team_members", key: "id", newestFirst: false },
   projects: { name: "projects", key: "id", newestFirst: false },
   issues: { name: "issues", key: "id", newestFirst: false },
   issue_assignments: { name: "issue_assignments", key: "id", newestFirst: false },
@@ -64,6 +66,13 @@ const LOCK_ID = "db-writer";
 const LOCK_TTL_MS = 30_000;
 /** How long a writer waits for the lease before giving up. */
 const LOCK_WAIT_MS = 20_000;
+
+export class StoreConsistencyError extends Error {
+  constructor() {
+    super("Could not read a consistent database snapshot");
+    this.name = "StoreConsistencyError";
+  }
+}
 
 function cacheTtlMs(): number {
   const raw = Number.parseInt(process.env.MONGODB_CACHE_TTL_MS ?? "", 10);
@@ -318,8 +327,7 @@ async function loadConsistent(): Promise<DB> {
     if (!after.writing && before.version === after.version) return loaded.rows;
     await sleep(25 + attempt * 25);
   }
-  const { db: fallback } = await getMongo();
-  return (await loadAll(fallback)).rows;
+  throw new StoreConsistencyError();
 }
 
 // ---------------------------------------------------------------------------

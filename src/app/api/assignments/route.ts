@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { readDB } from "@/lib/store";
-import { requireMember, handleApiError, ApiError } from "@/lib/api";
-import { getSessionUser } from "@/lib/auth";
+import { requireUser, requireMember, handleApiError, ApiError } from "@/lib/api";
 
 export async function GET(req: Request) {
   try {
@@ -20,8 +19,7 @@ export async function GET(req: Request) {
     }
     let userId: string | null = null;
     if (mine === "1") {
-      const u = await getSessionUser();
-      if (u) userId = u.id;
+      userId = (await requireUser()).id;
     }
     if (wsId) await requireMember(wsId);
     else if (mine !== "1") throw new ApiError(400, "workspace is required");
