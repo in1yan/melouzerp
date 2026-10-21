@@ -34,9 +34,6 @@ yarn-error.log*
 .env*
 !.env.example
 
-# local data store (keep the directory, ignore generated db)
-/data/db.json
-
 # local dev logs
 dev-server.log
 dev-server.err

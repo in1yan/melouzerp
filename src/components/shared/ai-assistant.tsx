@@ -68,14 +68,14 @@ export function AIAssistant() {
       <Button
         onClick={() => setOpen((o) => !o)}
         size="icon"
-        className="fixed bottom-4 right-4 z-40 h-11 w-11 rounded-full shadow-lg"
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 h-11 w-11 rounded-full shadow-lg"
         title="AI assistant"
       >
         {open ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
       </Button>
 
       {open && (
-        <div className="fixed bottom-20 right-4 z-40 flex h-[540px] w-[24rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl">
+        <div className="fixed bottom-20 right-2 z-40 flex h-[min(540px,calc(100dvh-6rem))] w-[24rem] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl sm:right-4">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4" />

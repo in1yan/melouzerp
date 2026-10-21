@@ -4,7 +4,7 @@ import { mutate, nowISO, readDB } from "@/lib/store";
 import { requireMember, handleApiError, parseBody, ApiError } from "@/lib/api";
 import { isSuperiorRole } from "@/lib/auth";
 import { logActivity, ensureProjectKey } from "@/lib/domain";
-import { deleteAttachmentBlobs } from "@/lib/attachments";
+import { deleteAttachmentFiles } from "@/lib/attachments";
 import type { DB } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -102,7 +102,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     if (!isSuperiorRole(role) && project.lead_id !== user.id) {
       throw new ApiError(403, "Only workspace admins, leads, or the project lead can delete a project");
     }
-    const blobPathnames = await mutate((db2) => {
+    const removedFileIds = await mutate((db2) => {
       const issueIds = db2.issues.filter((i) => i.project_id === id).map((i) => i.id);
       const assignmentIds = db2.issue_assignments
         .filter((a) => issueIds.includes(a.issue_id))
@@ -125,9 +125,9 @@ export async function DELETE(_req: Request, ctx: Ctx) {
         entity_id: id,
         summary: `${user.name} deleted project "${project.name}"`,
       });
-      return removed.map((att) => att.blob_pathname);
+      return removed.map((att) => att.id);
     });
-    await deleteAttachmentBlobs(blobPathnames);
+    await deleteAttachmentFiles(removedFileIds);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

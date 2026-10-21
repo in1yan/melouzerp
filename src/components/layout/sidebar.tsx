@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Calendar,
   CheckSquare,
@@ -53,6 +53,13 @@ export function Sidebar() {
   const pathname = usePathname();
   const { workspace, workspaces, selectWorkspace, refresh } = useWorkspace();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener("melouz:open-mobile-nav", open);
+    return () => window.removeEventListener("melouz:open-mobile-nav", open);
+  }, []);
 
   const createWorkspace = async () => {
     const name = window.prompt("Workspace name");
@@ -71,9 +78,19 @@ export function Sidebar() {
   };
 
   return (
+    <>
+    {mobileOpen && (
+      <button
+        aria-label="Close navigation"
+        className="fixed inset-0 z-40 bg-black/20 md:hidden"
+        onClick={() => setMobileOpen(false)}
+      />
+    )}
     <aside
       className={cn(
-        "relative flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200",
+        "relative flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-72 max-md:shadow-xl max-md:transition-transform",
+        mobileOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+        "md:flex",
         collapsed ? "w-14" : "w-60"
       )}
     >
@@ -122,6 +139,7 @@ export function Sidebar() {
             <Link
               key={item.label}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               title={collapsed ? item.label : undefined}
               className={cn(
                 "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors",
@@ -137,7 +155,10 @@ export function Sidebar() {
           );
         })}
         <button
-          onClick={() => window.dispatchEvent(new CustomEvent("melouz:open-messages"))}
+          onClick={() => {
+            setMobileOpen(false);
+            window.dispatchEvent(new CustomEvent("melouz:open-messages"));
+          }}
           title={collapsed ? "Messages" : undefined}
           className={cn(
             "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
@@ -155,5 +176,6 @@ export function Sidebar() {
         </div>
       )}
     </aside>
+    </>
   );
 }

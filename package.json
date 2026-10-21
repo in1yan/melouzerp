@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:mongodb": "node scripts/migrate-json-to-mongodb.mjs",
+    "e2e:mongodb": "node scripts/e2e-mongodb.mjs",
+    "e2e:concurrency": "node scripts/e2e-concurrency.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -24,7 +27,6 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/react-query": "^5.104.5",
     "@tanstack/react-table": "^9.3.1",
-    "@vercel/blob": "^2.8.2",
     "blobatar": "^2.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -32,6 +34,7 @@
     "cn": "^0.5.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.59.0",
+    "mongodb": "^6.21.0",
     "next": "16.4.2",
     "next-themes": "^0.4.6",
     "react": "19.3.0",

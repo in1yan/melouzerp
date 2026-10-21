@@ -151,7 +151,7 @@ function IssuesPageInner() {
   }
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Issues</h1>
@@ -174,7 +174,7 @@ function IssuesPageInner() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search title, description, key…"
-            className="h-8 w-56 pl-8 text-sm"
+            className="h-8 w-full pl-8 text-sm sm:w-56"
           />
         </div>
         <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className={selectCls}>

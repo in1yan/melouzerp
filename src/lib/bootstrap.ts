@@ -13,7 +13,19 @@ function resetRequested(): boolean {
   return v === "1" || v === "true" || v === "yes";
 }
 
-let bootstrapAttempted = false;
+/**
+ * How long a successful check is trusted. The database can be reset or
+ * repointed while the process is running (a fresh cluster, a restored
+ * snapshot, …) — after this interval the provisioning state is verified
+ * again so the admin account and the company workspace are re-created when
+ * they are missing.
+ */
+const BOOTSTRAP_RECHECK_MS = 30_000;
+
+let bootstrapCheckedAt = 0;
+let bootstrapReady = false;
+/** A password reset is applied once per process, not on every re-check. */
+let resetApplied = false;
 
 function resolveAdminPassword(): { password: string; generated: boolean } {
   const fromEnv = process.env.DEFAULT_ADMIN_PASSWORD?.trim();
@@ -27,15 +39,14 @@ function resolveAdminPassword(): { password: string; generated: boolean } {
 }
 
 export async function ensureBootstrap(): Promise<void> {
-  if (bootstrapAttempted) return;
-  bootstrapAttempted = true;
+  if (bootstrapReady && Date.now() - bootstrapCheckedAt < BOOTSTRAP_RECHECK_MS) return;
   try {
     const current = await readDB();
     const existingAdmin = current.users.find((u) => u.email === DEFAULT_ADMIN_EMAIL);
     const hasCredential =
       Boolean(existingAdmin) &&
       current.password_credentials.some((c) => c.user_id === existingAdmin!.id);
-    const isReset = resetRequested();
+    const isReset = resetRequested() && !resetApplied;
     const needsPassword = !existingAdmin || !hasCredential || isReset;
 
     // Fast path: if everything is already provisioned, avoid a redundant write
@@ -52,6 +63,8 @@ export async function ensureBootstrap(): Promise<void> {
       ? current.workspace_members.some((m) => m.workspace_id === company.id && m.role === "owner")
       : false;
     if (!isReset && company && existingAdmin && hasCredential && adminMembership && hasOwner) {
+      bootstrapReady = true;
+      bootstrapCheckedAt = Date.now();
       return;
     }
 
@@ -153,8 +166,13 @@ export async function ensureBootstrap(): Promise<void> {
           `\n            Remove RESET_ADMIN_PASSWORD from your environment now so future restarts keep it.\n`
       );
     }
+    if (isReset) resetApplied = true;
+    bootstrapReady = true;
+    bootstrapCheckedAt = Date.now();
   } catch (err) {
-    bootstrapAttempted = false;
+    // Retry on the next request — the database may not have been reachable.
+    bootstrapReady = false;
+    bootstrapCheckedAt = 0;
     console.error("[bootstrap]", err);
   }
 }

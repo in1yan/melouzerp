@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { readDB } from "@/lib/store";
 import { requireMember, handleApiError, ApiError } from "@/lib/api";
-import { attachmentDisposition, readAttachmentBlob } from "@/lib/attachments";
-import { isBlobStore } from "@/lib/store";
+import { attachmentDisposition, readAttachmentFile } from "@/lib/attachments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -26,12 +25,14 @@ export async function GET(_req: Request, ctx: Ctx) {
 
     const disposition = attachmentDisposition(attachment);
 
-    if (attachment.blob_pathname && isBlobStore()) {
-      const { stream, contentType } = await readAttachmentBlob(attachment.blob_pathname);
-      return new NextResponse(stream, {
+    // Files live in MongoDB as BSON binary; `data_url` is the legacy
+    // inline format and is only used for rows migrated from the JSON store.
+    const stored = await readAttachmentFile(attachment.id);
+    if (stored) {
+      return new NextResponse(new Uint8Array(stored.buffer), {
         headers: {
-          "Content-Type": contentType || attachment.content_type,
-          "Content-Length": String(attachment.size),
+          "Content-Type": stored.contentType || attachment.content_type,
+          "Content-Length": String(stored.buffer.length),
           "Content-Disposition": disposition,
           "Cache-Control": "private, max-age=0, must-revalidate",
           "X-Content-Type-Options": "nosniff",

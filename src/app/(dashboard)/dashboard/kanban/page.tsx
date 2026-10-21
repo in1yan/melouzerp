@@ -264,7 +264,7 @@ function KanbanInner() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="flex h-full min-w-0 flex-col p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Board</h1>
@@ -296,23 +296,25 @@ function KanbanInner() {
       )}
 
       {loading ? (
-        <div className="mt-4 grid flex-1 grid-cols-5 gap-3">
+        <div className="mt-4 grid min-w-[900px] flex-1 grid-cols-5 gap-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-64 animate-pulse rounded-lg bg-muted/40" />
           ))}
         </div>
       ) : (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveId(null)}>
-          <div className="mt-4 grid min-h-0 flex-1 grid-cols-5 gap-3 overflow-x-auto">
-            {ISSUE_STATUSES.map((s) => (
-              <Column
-                key={s}
-                status={s}
-                issues={byStatus[s]}
-                onOpen={setDetailId}
-                onQuickAdd={(status) => setNewStatus(status)}
-              />
-            ))}
+          <div className="mt-4 min-h-0 flex-1 overflow-x-auto pb-2">
+            <div className="grid min-w-[900px] grid-cols-5 gap-3">
+              {ISSUE_STATUSES.map((s) => (
+                <Column
+                  key={s}
+                  status={s}
+                  issues={byStatus[s]}
+                  onOpen={setDetailId}
+                  onQuickAdd={(status) => setNewStatus(status)}
+                />
+              ))}
+            </div>
           </div>
           <DragOverlay>{activeIssue ? <Card issue={activeIssue} onOpen={() => {}} draggable={false} overlay /> : null}</DragOverlay>
         </DndContext>

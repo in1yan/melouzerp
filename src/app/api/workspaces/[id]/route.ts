@@ -3,7 +3,7 @@ import { z } from "zod";
 import { mutate, nowISO, readDB } from "@/lib/store";
 import { requireAdmin, requireMember, handleApiError, parseBody, ApiError } from "@/lib/api";
 import { logActivity, slugify, ensureWorkspaceSlug } from "@/lib/domain";
-import { deleteAttachmentBlobs } from "@/lib/attachments";
+import { deleteAttachmentFiles } from "@/lib/attachments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -81,7 +81,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     if (workspace.is_company) {
       throw new ApiError(400, "The company workspace cannot be deleted");
     }
-    const blobPathnames = await mutate((db) => {
+    const removedFileIds = await mutate((db) => {
       const isOwner = db.workspace_members.some(
         (m) => m.workspace_id === id && (m.role === "owner" || m.role === "admin")
       );
@@ -111,9 +111,9 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       db.workspace_members = db.workspace_members.filter((m) => m.workspace_id !== id);
       db.activities = db.activities.filter((a) => a.workspace_id !== id);
       db.workspaces = db.workspaces.filter((w) => w.id !== id);
-      return removedAttachments.map((att) => att.blob_pathname);
+      return removedAttachments.map((att) => att.id);
     });
-    await deleteAttachmentBlobs(blobPathnames);
+    await deleteAttachmentFiles(removedFileIds);
     return NextResponse.json({ ok: true, deleted: workspace.name });
   } catch (err) {
     return handleApiError(err);

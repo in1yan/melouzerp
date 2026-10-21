@@ -1,15 +1,29 @@
 # MELOUZ OS
 
-Polished project management + ERP inspired by Notion and Plane.so. Runs fully on localhost
-with real authentication and durable local data — no external services required.
+Polished project management + ERP inspired by Notion and Plane.so. Runs fully on
+localhost with real authentication and durable data in MongoDB.
 
 ## Start
 
 ```bash
 npm install
+cp .env.example .env.local      # set MONGODB_URI
 npm run dev
 # open http://localhost:3000
 ```
+
+You need a MongoDB server. Either run one locally:
+
+```bash
+# Docker
+docker run -d --name melouz-mongo -p 27017:27017 mongo:8
+
+# or a local mongod
+mongod --dbpath /path/to/data --bind_ip 127.0.0.1
+```
+
+or point `MONGODB_URI` at an Atlas cluster. The connection string is the only
+required setting.
 
 Sign up as a **lead** or **employee** (pick your role on the sign-up page). New accounts are
 **pending** until an admin approves them — you can log in, but you'll see an "awaiting
@@ -26,10 +40,14 @@ leads; leads see their employees).
 - **Auth** — self-contained, no Supabase. Passwords are hashed with Node `scrypt`
   (`src/lib/auth.ts`). Sessions are random tokens stored in an `httpOnly` cookie
   (`melouz_session`, 30-day TTL) and validated per request.
-- **Data** — a typed JSON store at `~/.melouz-os/data/db.json` (`src/lib/store.ts`) written
-  atomically (temp file + rename). It lives **outside** the project folder on purpose so that
-  writes don't trigger Next.js/Turbopack dev recompiles. Override with `MELOUZ_DATA_DIR`.
-  Survives server restarts.
+- **Data** — MongoDB, one collection per entity (users, issues, projects, comments,
+  attachments, …). The connection string comes from `MONGODB_URI` (`src/lib/mongo.ts`).
+  `src/lib/store.ts` exposes the same `readDB()` / `mutate()` API the rest of the app uses:
+  a mutation takes the MongoDB write lease, reloads a fresh snapshot, applies the change and
+  writes back only the rows that actually changed. Reads are served from a short lived cache
+  and validated against a version counter so a reader never sees a half-written database.
+- **Files** — uploaded proof-of-work files are stored as BSON binary in the
+  `attachment_files` collection; the metadata lives next to it in `submission_attachments`.
 - **API** — REST route handlers under `src/app/api/**` with zod validation
   (`src/lib/api.ts`) and role checks (owner/admin/lead/employee).
 - **Route protection** — `src/proxy.ts` (Next.js 16 Proxy, formerly middleware) guards
@@ -59,8 +77,15 @@ leads; leads see their employees).
 
 ## Configuration
 
-Everything works with zero configuration. To enable the AI assistant, set `AI_API_KEY`
-(and optionally `AI_API_BASE_URL`, `AI_MODEL`) in `.env.local` — see `.env.example`.
+| Variable | Required | Description |
+| --- | --- | --- |
+| `MONGODB_URI` | yes | MongoDB connection string (`mongodb://…` / `mongodb+srv://…`) |
+| `MONGODB_DB` | no | Database name — defaults to the name in the URI, else `melouz` |
+| `MONGODB_CACHE_TTL_MS` | no | Read cache lifetime in ms (default `1000`) |
+| `AI_API_KEY` | no | Enables the AI assistant |
+| `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` | no | Seeded admin account |
+
+See `.env.example` for the full list.
 
 ## Scripts
 
@@ -68,12 +93,28 @@ Everything works with zero configuration. To enable the AI assistant, set `AI_AP
 npm run dev     # development server
 npm run build   # production build
 npm run start   # serve the production build
+npm run migrate:mongodb   # import the legacy JSON store into MongoDB
+npm run e2e:mongodb       # end-to-end suite (70 checks) against a running server
+npm run e2e:concurrency   # parallel-write / no-lost-update checks
 npx tsc --noEmit    # type check
 npx eslint          # lint
 ```
 
+Both e2e scripts refuse to run against a database whose name does not contain
+`e2e`, `test` or `ci`, so they can never wipe real data.
+
 ## Data & reset
 
-All data lives in `~/.melouz-os/data/db.json` (outside the repo, so writes never trigger
-dev recompiles). Delete that file to reset the app. Set `MELOUZ_DATA_DIR` to store it
-somewhere else (e.g. inside the repo) if you prefer.
+All data lives in the MongoDB database. To reset the app, drop the database
+(`mongosh --eval 'db.dropDatabase()'`); the next request re-seeds the default
+admin and the company workspace.
+
+Migrating from the old JSON store (`~/.melouz-os/data/db.json`):
+
+```bash
+MONGODB_URI=mongodb://127.0.0.1:27017/melouz npm run migrate:mongodb
+```
+
+The script reads `MONGODB_URI` from the environment, falling back to
+`.env.local` / `.env` in the project root. Use `--dry-run` to preview and
+`--force` to import into a database that already holds users.

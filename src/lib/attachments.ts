@@ -1,10 +1,24 @@
-import { del, get, put } from "@vercel/blob";
-import { newId, nowISO, isBlobStore } from "./store";
+import { Binary } from "mongodb";
+import { getMongo } from "./mongo";
+import { newId, nowISO } from "./store";
 import { ApiError } from "./api";
 import type { SubmissionAttachment } from "./types";
 
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_FILES_PER_SUBMISSION = 20;
+
+/** Collection holding the uploaded file bytes. */
+export const ATTACHMENT_FILES_COLLECTION = "attachment_files";
+
+/** Shape of a stored file document. */
+interface FileDoc {
+  _id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  data: unknown;
+  uploaded_at: string;
+}
 
 export const ALLOWED_ATTACHMENT_TYPES = [
   "application/pdf",
@@ -24,7 +38,7 @@ export interface IncomingFile {
   data_url: string;
 }
 
-const DATA_URL_RE = /^data:([a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
+const DATA_URL_RE = /^data:([a-z0-9!#$%^&*_.+-]+\/[a-z0-9!#$%^&*_.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
 
 export function sanitizeFilename(name: string): string {
   return (
@@ -100,41 +114,80 @@ export function prepareAttachment(
 }
 
 /**
- * Persists a prepared attachment. On Vercel the bytes go to a private Blob;
- * locally they stay inline in the JSON store. Returns the stored record.
+ * Persists a prepared attachment. The bytes are stored as BSON binary in a
+ * dedicated collection so a 10 MB file never has to fit into a single
+ * document together with its metadata.
  */
 export async function storeAttachment(prepared: PreparedAttachment): Promise<SubmissionAttachment> {
   const { record, buffer } = prepared;
-  if (isBlobStore()) {
-    const pathname = `attachments/${record.id}/${encodeURIComponent(record.filename)}`;
-    await put(pathname, buffer, {
-      access: "private",
-      contentType: record.content_type,
-    });
-    return { ...record, blob_pathname: pathname, uploaded_at: nowISO() };
-  }
-  const dataUrl = `data:${record.content_type};base64,${buffer.toString("base64")}`;
-  return { ...record, data_url: dataUrl, uploaded_at: nowISO() };
+  const { db } = await getMongo();
+  await db.collection<FileDoc>(ATTACHMENT_FILES_COLLECTION).insertOne({
+    _id: record.id,
+    filename: record.filename,
+    content_type: record.content_type,
+    size: record.size,
+    data: new Binary(buffer),
+    uploaded_at: nowISO(),
+  });
+  return { ...record, uploaded_at: nowISO() };
 }
 
-/** Deletes blobs for the given pathnames; best-effort, never throws. */
-export async function deleteAttachmentBlobs(pathnames: (string | null | undefined)[]): Promise<void> {
-  const targets = pathnames.filter(
-    (p): p is string => typeof p === "string" && p.startsWith("attachments/")
-  );
+/** Deletes the stored bytes for the given attachment ids; best effort. */
+export async function deleteAttachmentFiles(ids: (string | null | undefined)[]): Promise<void> {
+  const targets = ids.filter((id): id is string => typeof id === "string" && id.length > 0);
   if (!targets.length) return;
   try {
-    await del(targets);
+    const { db } = await getMongo();
+    await db.collection<FileDoc>(ATTACHMENT_FILES_COLLECTION).deleteMany({ _id: { $in: targets } });
   } catch (err) {
-    console.error("[attachments] blob delete failed", err);
+    console.error("[attachments] file delete failed", err);
   }
 }
 
-/** Fetches attachment bytes (Vercel Blob mode only; local mode uses data_url). */
-export async function readAttachmentBlob(
-  pathname: string
-): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string }> {
-  const result = await get(pathname, { access: "private", useCache: false });
-  if (!result || !result.stream) throw new ApiError(404, "File no longer exists in storage");
-  return { stream: result.stream, contentType: result.blob.contentType ?? "application/octet-stream" };
+function binaryToBuffer(value: unknown): Buffer | null {
+  if (!value) return null;
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+  const binary = value as { value?: () => ArrayBuffer | Uint8Array; buffer?: ArrayBuffer; position?: number };
+  if (typeof binary.value === "function") {
+    const raw = binary.value();
+    if (raw instanceof Uint8Array) return Buffer.from(raw);
+    return Buffer.from(new Uint8Array(raw));
+  }
+  if (binary.buffer) {
+    return Buffer.from(
+      new Uint8Array(binary.buffer, 0, binary.position ?? binary.buffer.byteLength)
+    );
+  }
+  return null;
+}
+
+/** Reads the stored bytes of an attachment. */
+export async function readAttachmentFile(
+  attachmentId: string
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const { db } = await getMongo();
+  const doc = await db.collection<FileDoc>(ATTACHMENT_FILES_COLLECTION).findOne({ _id: attachmentId });
+  if (!doc) return null;
+  const buffer = binaryToBuffer(doc.data);
+  if (!buffer) return null;
+  return {
+    buffer,
+    contentType: String(doc.content_type ?? "application/octet-stream"),
+  };
+}
+
+/** Total number of bytes and files stored for attachments. */
+export async function attachmentFileStats(): Promise<{ count: number; bytes: number }> {
+  const { db } = await getMongo();
+  const collection = db.collection<FileDoc>(ATTACHMENT_FILES_COLLECTION);
+  const count = await collection.estimatedDocumentCount();
+  let bytes = 0;
+  try {
+    const stats = await db.command({ collStats: ATTACHMENT_FILES_COLLECTION });
+    bytes = Number(stats?.size ?? 0);
+  } catch {
+    bytes = 0;
+  }
+  return { count, bytes };
 }

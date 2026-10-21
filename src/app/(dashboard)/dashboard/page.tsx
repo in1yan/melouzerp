@@ -130,19 +130,19 @@ export default function DashboardPage() {
   const totalStatus = data ? STATUS_ORDER.reduce((sum, st) => sum + (data.by_status[st] ?? 0), 0) : 0;
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-8 px-6 py-8 lg:px-10">
-      <div className="flex items-end justify-between">
+    <div className="mx-auto max-w-[1440px] space-y-8 px-4 py-6 sm:px-6 sm:py-8 lg:px-10">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-[40px] font-bold leading-[1.1] tracking-[-0.04em]">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {workspace.name} · signed in as {user.name}
           </p>
         </div>
-        <div className="flex gap-2 text-sm">
-          <Link href="/dashboard/issues" className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+        <div className="flex w-full gap-2 text-sm sm:w-auto">
+          <Link href="/dashboard/issues" className="flex-1 rounded-full bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:flex-none">
             All issues
           </Link>
-          <Link href="/dashboard/kanban" className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-accent">
+          <Link href="/dashboard/kanban" className="flex-1 rounded-full border border-border bg-card px-4 py-2 text-center text-sm font-medium transition-colors hover:bg-accent sm:flex-none">
             Board
           </Link>
         </div>
@@ -191,7 +191,7 @@ export default function DashboardPage() {
                     return <div key={st} className={color} style={{ width: `${pct}%` }} title={`${STATUS_LABELS[st]}: ${count}`} />;
                   })}
                 </div>
-                <div className="grid grid-cols-5 gap-2 text-center">
+                <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-5">
                   {STATUS_ORDER.map((st) => (
                     <div key={st} className="rounded-md bg-muted/50 p-2">
                       <div className="text-lg font-semibold tabular-nums">{data!.by_status[st] ?? 0}</div>

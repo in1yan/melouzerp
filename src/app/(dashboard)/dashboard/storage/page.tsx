@@ -24,14 +24,14 @@ interface AttachmentRow {
 }
 
 interface StorageSummary {
-  mode: "blob" | "file";
+  mode: "mongodb";
   db_bytes: number;
   collections: CollectionStat[];
   attachments: {
     count: number;
     inline_bytes: number;
-    blob_count: number;
-    blob_bytes: number;
+    file_count: number;
+    file_bytes: number;
     orphan_count: number;
     orphans: { id: string; filename: string; size: number; uploaded_at: string }[];
     recent: AttachmentRow[];
@@ -182,11 +182,11 @@ export default function StoragePage() {
   };
 
   const totalStoredBytes =
-    summary ? summary.db_bytes + summary.attachments.blob_bytes + summary.attachments.inline_bytes : 0;
+    summary ? summary.db_bytes + summary.attachments.file_bytes + summary.attachments.inline_bytes : 0;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <HardDrive className="h-5 w-5" /> Storage management
@@ -209,12 +209,12 @@ export default function StoragePage() {
               icon={<Database className="h-4 w-4" />}
               title="Database"
               value={fmtBytes(summary.db_bytes)}
-              sub={`${summary.mode === "blob" ? "Vercel Blob" : "Local file"} · JSON store`}
+              sub={`${summary.mode === "mongodb" ? "MongoDB" : "Database"} · document store`}
             />
             <Panel
               icon={<FileStack className="h-4 w-4" />}
               title="Uploaded files"
-              value={fmtBytes(summary.attachments.blob_bytes + summary.attachments.inline_bytes)}
+              value={fmtBytes(summary.attachments.file_bytes + summary.attachments.inline_bytes)}
               sub={`${summary.attachments.count} file(s)`}
             />
             <Panel
@@ -227,7 +227,7 @@ export default function StoragePage() {
 
           <section className="rounded-lg border">
             <div className="border-b px-4 py-2.5 text-sm font-medium">Data by collection</div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-sm">
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="px-4 py-2 font-medium">Collection</th>
@@ -244,7 +244,7 @@ export default function StoragePage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </section>
 
           <section className="rounded-lg border">
@@ -286,7 +286,7 @@ export default function StoragePage() {
               <p className="px-4 py-3 text-sm text-muted-foreground">No files stored.</p>
             ) : (
               <div className="max-h-96 overflow-y-auto">
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-sm">
                   <thead>
                     <tr className="text-left text-xs text-muted-foreground">
                       <th className="px-4 py-2 font-medium">File</th>
@@ -320,7 +320,7 @@ export default function StoragePage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             )}
           </section>

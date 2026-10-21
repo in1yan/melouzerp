@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
-import { Bell, LogOut, MessageSquare, Moon, Search, Settings, Sun } from "lucide-react";
+import { Bell, LogOut, Menu, MessageSquare, Moon, Search, Settings, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -93,14 +93,23 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/80 bg-background px-6">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/80 bg-background px-3 sm:px-6">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 md:hidden"
+        title="Open navigation"
+        onClick={() => window.dispatchEvent(new CustomEvent("melouz:open-mobile-nav"))}
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
       <button
         onClick={openSearch}
-        className="flex h-9 max-w-md flex-1 items-center gap-2 rounded-md border border-border/80 bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
+        className="flex h-9 min-w-0 max-w-md flex-1 items-center gap-2 rounded-md border border-border/80 bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
       >
         <Search className="h-3.5 w-3.5" />
-        <span>Search issues, projects, docs…</span>
-        <kbd className="ml-auto rounded border bg-background px-1.5 py-0.5 text-[10px] font-medium">⌘K</kbd>
+        <span className="truncate">Search issues, projects, docs…</span>
+        <kbd className="ml-auto hidden shrink-0 rounded border bg-background px-1.5 py-0.5 text-[10px] font-medium sm:inline">⌘K</kbd>
       </button>
 
       <div className="ml-auto flex items-center gap-1">

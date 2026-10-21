@@ -4,7 +4,7 @@ import { mutate, nowISO, readDB } from "@/lib/store";
 import { requireMember, handleApiError, parseBody, ApiError } from "@/lib/api";
 import { isAdminRole } from "@/lib/auth";
 import { logActivity, notify, issueKey, userLite } from "@/lib/domain";
-import { deleteAttachmentBlobs } from "@/lib/attachments";
+import { deleteAttachmentFiles } from "@/lib/attachments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -156,7 +156,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     if (!isAdminRole(role) && user.id !== issue.reporter_id) {
       throw new ApiError(403, "Only the person who created this issue or an admin can delete it");
     }
-    const blobPathnames = await mutate((db) => {
+    const removedFileIds = await mutate((db) => {
       const childIds = db.issues.filter((i) => i.parent_id === id).map((i) => i.id);
       const allIds = [id, ...childIds];
       const assignmentIds = db.issue_assignments
@@ -179,9 +179,9 @@ export async function DELETE(_req: Request, ctx: Ctx) {
         entity_id: id,
         summary: `${user.name} deleted ${issueKey(db, issue)} "${issue.title}"`,
       });
-      return removedAttachments.map((att) => att.blob_pathname);
+      return removedAttachments.map((att) => att.id);
     });
-    await deleteAttachmentBlobs(blobPathnames);
+    await deleteAttachmentFiles(removedFileIds);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return handleApiError(err);

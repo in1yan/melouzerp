@@ -131,7 +131,7 @@ function CalendarInner() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
+    <div className="flex h-full min-w-0 flex-col overflow-x-auto p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
@@ -168,7 +168,7 @@ function CalendarInner() {
         <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
       )}
 
-      <div className="mt-4 grid grid-cols-7 border-b pb-1 text-center text-xs font-medium text-muted-foreground">
+      <div className="mt-4 grid min-w-[700px] grid-cols-7 border-b pb-1 text-center text-xs font-medium text-muted-foreground">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
           <div key={d} className="py-1">
             {d}
@@ -177,13 +177,13 @@ function CalendarInner() {
       </div>
 
       {loading ? (
-        <div className="mt-2 grid flex-1 animate-pulse grid-cols-7 gap-1">
+        <div className="mt-2 grid min-w-[700px] flex-1 animate-pulse grid-cols-7 gap-1">
           {[...Array(35)].map((_, i) => (
             <div key={i} className="min-h-24 rounded bg-muted/40" />
           ))}
         </div>
       ) : (
-        <div className="mt-2 grid min-h-0 flex-1 grid-cols-7 gap-1">
+        <div className="mt-2 grid min-w-[700px] min-h-0 flex-1 grid-cols-7 gap-1">
           {days.map((day) => {
             const dayIssues = issuesFor(day);
             const dayEvents = eventsFor(day);

@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { mutate, readDB, isBlobStore } from "@/lib/store";
+import { mutate, readDB, collectionStats } from "@/lib/store";
 import { handleApiError, parseBody, ApiError } from "@/lib/api";
 import { requireAppAdmin } from "@/lib/admin";
-import { deleteAttachmentBlobs } from "@/lib/attachments";
+import { attachmentFileStats, deleteAttachmentFiles } from "@/lib/attachments";
 import { pruneAttempts } from "@/lib/rate-limit";
-import { list } from "@vercel/blob";
 import type { DB } from "@/lib/types";
-
-const ATTACHMENTS_PREFIX = "attachments/";
 
 function approxSize(value: unknown): number {
   try {
@@ -16,16 +13,6 @@ function approxSize(value: unknown): number {
   } catch {
     return 0;
   }
-}
-
-function collectionStats(db: DB) {
-  const entries = Object.entries(db as unknown as Record<string, unknown>).map(([key, value]) => ({
-    name: key,
-    count: Array.isArray(value) ? value.length : 0,
-    bytes: approxSize(value),
-  }));
-  entries.sort((a, b) => b.bytes - a.bytes);
-  return entries;
 }
 
 export async function GET() {
@@ -43,19 +30,7 @@ export async function GET() {
     const rejectedUsers = db.users.filter((u) => u.approval_status === "rejected");
     const pendingUsers = db.users.filter((u) => u.approval_status === "pending");
 
-    let blobTotalBytes = 0;
-    let blobCount = 0;
-    if (isBlobStore()) {
-      try {
-        const page = await list({ prefix: ATTACHMENTS_PREFIX, limit: 1000 });
-        for (const b of page.blobs) {
-          blobCount += 1;
-          blobTotalBytes += b.size ?? 0;
-        }
-      } catch {
-        // listing is informational only
-      }
-    }
+    const files = await attachmentFileStats();
 
     const inlineAttachmentBytes = db.submission_attachments.reduce(
       (sum, att) => sum + (att.data_url ? att.data_url.length : 0),
@@ -63,14 +38,14 @@ export async function GET() {
     );
 
     return NextResponse.json({
-      mode: isBlobStore() ? "blob" : "file",
+      mode: "mongodb",
       db_bytes: approxSize(db),
-      collections: collectionStats(db),
+      collections: await collectionStats(),
       attachments: {
         count: db.submission_attachments.length,
         inline_bytes: inlineAttachmentBytes,
-        blob_count: blobCount,
-        blob_bytes: blobTotalBytes,
+        file_count: files.count,
+        file_bytes: files.bytes,
         orphan_count: orphanAttachments.length,
         orphans: orphanAttachments.slice(0, 50).map((att) => ({
           id: att.id,
@@ -88,7 +63,7 @@ export async function GET() {
             size: att.size,
             content_type: att.content_type,
             uploaded_at: att.uploaded_at,
-            stored: att.blob_pathname ? "blob" : "inline",
+            stored: att.data_url ? "inline" : "mongodb",
           })),
       },
       hygiene: {
@@ -129,7 +104,7 @@ export async function DELETE(req: Request) {
     const cutoffDays = body.older_than_days ?? 30;
     const cutoff = Date.now() - cutoffDays * 86400000;
 
-    let removedBlobs: (string | null)[] = [];
+    let removedFiles: (string | null)[] = [];
     const result = await mutate((db) => {
       switch (body.action) {
         case "purge_expired_sessions": {
@@ -176,7 +151,7 @@ export async function DELETE(req: Request) {
           db.submission_attachments = db.submission_attachments.filter(
             (a) => a.id !== body.attachment_id
           );
-          removedBlobs = [att.blob_pathname];
+          removedFiles = [att.id];
           return { removed: 1 };
         }
         case "purge_orphan_attachments": {
@@ -184,7 +159,7 @@ export async function DELETE(req: Request) {
           const orphans = db.submission_attachments.filter(
             (att) => !assignmentIds.has(att.assignment_id)
           );
-          removedBlobs = orphans.map((att) => att.blob_pathname);
+          removedFiles = orphans.map((att) => att.id);
           db.submission_attachments = db.submission_attachments.filter((att) =>
             assignmentIds.has(att.assignment_id)
           );
@@ -198,7 +173,7 @@ export async function DELETE(req: Request) {
           );
           const ids = new Set(oldAssignments.map((a) => a.id));
           const atts = db.submission_attachments.filter((att) => ids.has(att.assignment_id));
-          removedBlobs = atts.map((att) => att.blob_pathname);
+          removedFiles = atts.map((att) => att.id);
           db.issue_assignments = db.issue_assignments.filter((a) => !ids.has(a.id));
           db.submission_attachments = db.submission_attachments.filter(
             (att) => !ids.has(att.assignment_id)
@@ -208,7 +183,7 @@ export async function DELETE(req: Request) {
       }
     });
 
-    await deleteAttachmentBlobs(removedBlobs);
+    await deleteAttachmentFiles(removedFiles);
     return NextResponse.json({ ok: true, action: body.action, ...result });
   } catch (err) {
     return handleApiError(err);

@@ -135,7 +135,7 @@ export default function PerformancePage() {
         : "Your performance.";
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
       <div className="flex items-start gap-3">
         <div className="rounded-lg bg-primary/10 p-2 text-primary">
           <Gauge className="h-5 w-5" />

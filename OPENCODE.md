@@ -229,6 +229,90 @@ Next.js 16 ERP. Keep this file updated as work progresses.
   label is wrapped in `DropdownMenuGroup`. Verified in headless Chromium: bell + account
   menus open with **zero console errors**.
 
+## MongoDB migration (round 3)
+
+The JSON file store and the Vercel Blob backend were replaced by **MongoDB as the single
+datastore**. The connection string comes from the environment, so the same build runs
+against a local `mongod`, a Docker container or an Atlas cluster.
+
+### Configuration
+- `MONGODB_URI` — connection string (fallbacks: `MONGODB_URL`, `MONGO_URL`, `MONGOOSE_URI`).
+  A missing value throws `MongoConfigError` with a copy-pasteable example.
+- `MONGODB_DB` / `MONGODB_DB_NAME` / `MONGO_DB` — optional database name. When unset the
+  name is taken from the URI path (`mongodb://host:27017/melouz` → `melouz`), else `melouz`.
+- `MONGODB_CACHE_TTL_MS` (1000), `MONGODB_MAX_POOL_SIZE` (10),
+  `MONGODB_SERVER_SELECTION_TIMEOUT_MS` (8000) — optional tuning.
+- `mongodb` is already in Next.js' default `serverExternalPackages` list, so the driver is
+  externalized at runtime and **not** bundled into the server build. No `next.config.ts`
+  change was needed.
+
+### New/changed files
+- `src/lib/mongo.ts` (new) — env/URI resolution, `getMongo()` singleton cached on
+  `globalThis` (survives hot reloads), `closeMongo()`, best-effort index creation
+  (unique `users.email`, unique `workspace_members(workspace_id, user_id)` + plain indexes
+  on every query path).
+- `src/lib/store.ts` (rewritten) — same public contract (`readDB` / `writeDB` / `mutate` /
+  `newId` / `nowISO`), so none of the ~30 API routes changed. One collection per entity,
+  documents keep the exact TypeScript model shape plus two internal fields:
+  - `_id` — the natural key (`id`, or `user_id` / `token_hash` / `key` for the credential,
+    session and login-attempt collections).
+  - `_ord` — a monotonic order number that preserves the in-memory array order
+    (notifications and activities are read newest-first via a descending sort).
+- `src/lib/attachments.ts` (rewritten) — file bytes are stored as **BSON binary** in the new
+  `attachment_files` collection instead of a base64 `data_url` inside the metadata row
+  (avoids the 16 MB document limit and halves the storage). `data_url` is kept only as a
+  legacy fallback for rows migrated from the JSON store.
+- `src/app/api/admin/storage/route.ts` — the storage report is MongoDB based now:
+  `mode: "mongodb"`, `db_bytes`, per-collection `count`/`bytes`, and
+  `attachments.file_count` / `attachments.file_bytes` (were `blob_count` / `blob_bytes`).
+- `src/app/(dashboard)/dashboard/storage/page.tsx` — updated for the new summary shape.
+- `src/app/api/attachments/[id]/route.ts` — streams the bytes out of MongoDB.
+- `src/lib/store.ts` also exports `collectionStats()` and `dbRawSizeBytes()`.
+- `@vercel/blob` was removed from the dependencies; `mongodb@^6.21.0` was added.
+
+### How writes stay consistent
+1. `mutate()` serialises writes inside the process (promise queue) and takes a **MongoDB
+   write lease** in `_melouz_locks` (`db-writer`, 30 s TTL, 20 s wait) so several instances
+   can share one database.
+2. It then reloads a fresh snapshot, applies the callback and writes back **only the rows
+   that changed** (`bulkWrite` with `replaceOne` + `upsert: true`; a replacement document
+   must not contain `_id`).
+3. `_melouz_meta` holds a `{writing, version}` state document. Readers re-check the version
+   and the writing flag and retry, so nobody ever observes a half-written database. Reads
+   are served from a 1 s cache that is invalidated on every write.
+
+### Migration of the legacy JSON store
+- `scripts/migrate-json-to-mongodb.mjs` imports `~/.melouz-os/data/db.json` into MongoDB
+  (`npm run migrate:mongodb`, flags `--file`, `--force`, `--dry-run`). It reads
+  `MONGODB_URI` from the environment and falls back to `.env.local` / `.env` in the project
+  root, so it works without exporting anything. Inline base64 attachments are converted
+  into real `attachment_files` documents and the redundant `data_url` copy is dropped.
+- `scripts/e2e-mongodb.mjs` (`npm run e2e:mongodb`) — 70-check end-to-end suite covering
+  auth/bootstrap, sign-up + approvals, projects/issues, assign/submit/approve with a file
+  attachment and a byte-exact download, notifications/comments/documents/calendar/messages,
+  dashboard/search/performance/storage, plus direct MongoDB assertions on the stored
+  collections. It only ever wipes databases whose name contains `e2e` / `test` / `ci`.
+- `scripts/e2e-concurrency.mjs` (`npm run e2e:concurrency`) — writes rows in parallel and
+  proves that no update is lost. Run two instances with the same `--tag` against two
+  different servers to exercise the cross-process write lease (`--shared`).
+
+### Bug fix — bootstrap never re-ran after the database was reset
+`ensureBootstrap()` used a one-shot `bootstrapAttempted` flag, so a database that was
+dropped, restored or repointed while the process was running was never provisioned again
+(login failed with "Invalid email or password" on an empty database). The flag is now
+time-based: the provisioning state is re-verified every 30 s, and the admin account plus
+the company workspace are re-created when they are missing. `RESET_ADMIN_PASSWORD` is
+applied once per process instead of on every re-check.
+
+### Verification
+- `npx tsc --noEmit` and `npx eslint` clean, `npm run build` succeeds and the production
+  server (`next start`) logs in against MongoDB.
+- `npm run e2e:mongodb` → **70 passed, 0 failed**.
+- `npm run e2e:concurrency` → 10/10 with two production servers writing to the same
+  database at the same time: 144 rows written, 144 rows found, no lost updates.
+- Data survives a server restart; the migrated admin logs in with the original id
+  (`usr_4f1f1f9c-…`) and no duplicate admin is created.
+
 ## Verification commands
 
 ```bash
