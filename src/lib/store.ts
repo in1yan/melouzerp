@@ -32,10 +32,16 @@ export function isBlobStore(): boolean {
   );
   if (!process.env.VERCEL && !token) return false;
   if (!token && !oidcReady) {
+    const seen = [
+      `BLOB_READ_WRITE_TOKEN=${token ? "set" : "missing"}`,
+      `BLOB_STORE_ID=${process.env.BLOB_STORE_ID?.trim() ? "set" : "missing"}`,
+      `VERCEL_OIDC_TOKEN=${process.env.VERCEL_OIDC_TOKEN ? "set" : "missing"}`,
+    ].join(", ");
     throw new Error(
-      "Vercel Blob is not configured. Create a Blob store in the Vercel dashboard " +
-        "(Storage -> Blob), connect it to this project, then redeploy so that " +
-        "BLOB_READ_WRITE_TOKEN is available."
+      "Vercel Blob is not configured in this deployment. Create a Blob store in the " +
+        "Vercel dashboard (Storage -> Blob), connect it to this project for the Production " +
+        "environment, then create a NEW deployment so the variables are injected " +
+        `(current deployment sees: ${seen}).`
     );
   }
   return true;
