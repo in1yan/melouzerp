@@ -1,5 +1,11 @@
+"use client";
+
+import { Blobatar } from "@blobatar/react";
+import "blobatar/motion.css";
 import { cn } from "@/lib/utils";
 import type { IssueStatus, Priority } from "@/lib/types";
+
+export { Blobatar };
 
 export const STATUS_META: Record<IssueStatus, { label: string; dot: string; badge: string }> = {
   backlog: { label: "Backlog", dot: "bg-slate-400", badge: "bg-slate-400/15 text-slate-600 dark:text-slate-300" },
@@ -60,34 +66,29 @@ export function PriorityIndicator({ priority, withLabel }: { priority: Priority;
 
 export function Avatar({
   name,
-  color,
   size = "md",
   className,
+  background,
 }: {
   name: string;
   color?: string;
   size?: "sm" | "md" | "lg";
   className?: string;
+  background?: boolean | "circle" | "square" | "squircle";
 }) {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
-  const sizeCls = size === "sm" ? "h-6 w-6 text-[10px]" : size === "lg" ? "h-10 w-10 text-sm" : "h-7 w-7 text-xs";
+  const sizeCls = size === "sm" ? "h-6 w-6" : size === "lg" ? "h-10 w-10" : "h-7 w-7";
+  const cleanName = typeof name === "string" ? name.trim() : "";
+  const seed = cleanName && cleanName !== "?" ? cleanName : "user";
+  const title = cleanName && cleanName !== "?" ? cleanName : undefined;
+
   return (
-    <span
-      className={cn(
-        "inline-flex shrink-0 select-none items-center justify-center rounded-full font-semibold text-white",
-        sizeCls,
-        className
-      )}
-      style={{ backgroundColor: color ?? "#64748b" }}
-      title={name}
-    >
-      {initials || "?"}
-    </span>
+    <Blobatar
+      name={seed}
+      animate="hover"
+      background={background}
+      className={cn("inline-block shrink-0 select-none", sizeCls, className)}
+      title={title}
+    />
   );
 }
 

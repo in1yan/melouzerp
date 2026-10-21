@@ -63,7 +63,7 @@ export default function SettingsPage() {
         <div className="border-b px-4 py-3 font-medium">Your profile</div>
         <form onSubmit={saveProfile} className="space-y-3 p-4">
           <div className="flex items-center gap-3">
-            <Avatar name={user.name} color={user.avatar_color} size="lg" />
+            <Avatar name={name.trim() || user.name} color={user.avatar_color} size="lg" />
             <div className="text-sm">
               <div className="font-medium">{user.email}</div>
               <div className="text-xs text-muted-foreground">Signed in locally · account created {new Date(user.created_at).toLocaleDateString()}</div>

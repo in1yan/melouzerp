@@ -180,9 +180,12 @@ export function Header() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
-              <DropdownMenuLabel>
-                <div className="truncate text-sm font-medium">{user.name}</div>
-                <div className="truncate text-xs font-normal text-muted-foreground">{user.email}</div>
+              <DropdownMenuLabel className="flex items-center gap-2.5">
+                <Avatar name={user.name} color={user.avatar_color} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{user.name}</div>
+                  <div className="truncate text-xs font-normal text-muted-foreground">{user.email}</div>
+                </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
