@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 
 const ROOT = 'relative h-full w-full min-h-0 min-w-0 overflow-hidden';
 const CANVAS = 'absolute inset-0 block h-full w-full';
@@ -119,7 +119,7 @@ const GridDistortion = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const controlRef = useRef<Control | null>(null);
-  const settings = {
+  const settings = useMemo(() => ({
     grid: clamp(Math.round(grid), 2, 120),
     radius: clamp(radius, 0.01, 1),
     strength: Math.max(0, strength),
@@ -130,9 +130,12 @@ const GridDistortion = ({
     idle: clamp(idle, 0, 1),
     clickRipple,
     intro
-  };
+  }), [grid, radius, strength, relaxation, mode, softness, chroma, idle, clickRipple, intro]);
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     const root = rootRef.current;
