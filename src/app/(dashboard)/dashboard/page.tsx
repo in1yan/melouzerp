@@ -65,7 +65,7 @@ function StatCard({
   tone?: "default" | "danger" | "success";
 }) {
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="rounded-xl border border-border/80 bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{label}</span>
         <Icon
@@ -75,7 +75,7 @@ function StatCard({
           )}
         />
       </div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-2 text-[26px] font-semibold tracking-[-0.04em] tabular-nums">{value}</div>
       {hint && <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
@@ -130,19 +130,19 @@ export default function DashboardPage() {
   const totalStatus = data ? STATUS_ORDER.reduce((sum, st) => sum + (data.by_status[st] ?? 0), 0) : 0;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="mx-auto max-w-[1440px] space-y-8 px-6 py-8 lg:px-10">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[40px] font-bold leading-[1.1] tracking-[-0.04em]">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             {workspace.name} · signed in as {user.name}
           </p>
         </div>
         <div className="flex gap-2 text-sm">
-          <Link href="/dashboard/issues" className="rounded-md border px-3 py-1.5 hover:bg-accent">
+          <Link href="/dashboard/issues" className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
             All issues
           </Link>
-          <Link href="/dashboard/kanban" className="rounded-md border px-3 py-1.5 hover:bg-accent">
+          <Link href="/dashboard/kanban" className="rounded-full border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-accent">
             Board
           </Link>
         </div>
@@ -170,7 +170,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-lg border bg-card lg:col-span-2">
+            <div className="rounded-xl border border-border/80 bg-card lg:col-span-2">
               <div className="flex items-center justify-between border-b px-4 py-3">
                 <div className="font-medium">Status breakdown</div>
                 <div className="text-xs text-muted-foreground">{totalStatus} issues</div>
@@ -232,8 +232,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="rounded-lg border bg-card">
+            <div className="space-y-5">
+              <div className="rounded-xl border border-border/80 bg-card">
                 <div className="border-b px-4 py-3 font-medium">Projects</div>
                 <div className="space-y-3 p-4">
                   {data!.projects.length === 0 && (
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border bg-card">
+              <div className="rounded-xl border border-border/80 bg-card">
                 <div className="border-b px-4 py-3 font-medium">Activity</div>
                 <div className="max-h-64 space-y-3 overflow-y-auto p-4">
                   {data!.recent_activity.length === 0 && (
@@ -291,7 +291,7 @@ export default function DashboardPage() {
 
               {data!.workload.length > 0 && (
                 <div className="rounded-lg border bg-card">
-                  <div className="border-b px-4 py-3 font-medium">Workload (open issues)</div>
+                  <div className="border-b px-4 py-3 font-medium">Workload <span className="font-normal text-muted-foreground">(open issues)</span></div>
                   <div className="space-y-2 p-4">
                     {data!.workload.map((m) => (
                       <div key={m.id} className="flex items-center gap-2 text-sm">

@@ -93,10 +93,10 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-13 shrink-0 items-center gap-2 border-b bg-background px-4">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/80 bg-background px-6">
       <button
         onClick={openSearch}
-        className="flex h-8 flex-1 max-w-md items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
+        className="flex h-9 max-w-md flex-1 items-center gap-2 rounded-md border border-border/80 bg-card px-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
       >
         <Search className="h-3.5 w-3.5" />
         <span>Search issues, projects, docs…</span>

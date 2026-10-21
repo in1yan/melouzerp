@@ -42,7 +42,7 @@ export function AppShell({
   return (
     <WorkspaceProvider user={user} initialWorkspaces={workspaces} initialActiveId={initialActiveId}>
       <UnauthorizedRedirect />
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-background">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <Header />

@@ -73,15 +73,15 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "relative flex h-full shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200",
+        "relative flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200",
         collapsed ? "w-14" : "w-60"
       )}
     >
-      <div className="flex h-13 items-center justify-between gap-1 border-b border-sidebar-border px-3 py-2">
+      <div className="flex h-14 items-center justify-between gap-1 border-b border-sidebar-border px-3 py-2">
         {!collapsed && (
           <DropdownMenu>
             <DropdownMenuTrigger className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-sm font-semibold hover:bg-sidebar-accent">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-foreground">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">
                 M
               </span>
               <span className="truncate">{workspace?.name ?? "No workspace"}</span>
@@ -124,9 +124,9 @@ export function Sidebar() {
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
+                "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] transition-colors",
                 active
-                  ? "bg-sidebar-accent font-medium text-sidebar-foreground"
+                  ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground",
                 collapsed && "justify-center px-1.5"
               )}
