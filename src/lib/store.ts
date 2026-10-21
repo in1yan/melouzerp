@@ -26,7 +26,19 @@ const BLOB_READ_TTL_MS = 4000;
 const MUTATE_RETRY_LIMIT = 6;
 
 export function isBlobStore(): boolean {
-  return Boolean(process.env.VERCEL || process.env.BLOB_READ_WRITE_TOKEN);
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  const oidcReady = Boolean(
+    process.env.BLOB_STORE_ID?.trim() && process.env.VERCEL_OIDC_TOKEN
+  );
+  if (!process.env.VERCEL && !token) return false;
+  if (!token && !oidcReady) {
+    throw new Error(
+      "Vercel Blob is not configured. Create a Blob store in the Vercel dashboard " +
+        "(Storage -> Blob), connect it to this project, then redeploy so that " +
+        "BLOB_READ_WRITE_TOKEN is available."
+    );
+  }
+  return true;
 }
 
 function migrateLegacyDb(): void {
