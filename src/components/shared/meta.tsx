@@ -1,7 +1,9 @@
 "use client";
 
 import { Blobatar } from "@blobatar/react";
+import { useGaze } from "@blobatar/react/gaze";
 import "blobatar/motion.css";
+import "blobatar/gaze.css";
 import { cn } from "@/lib/utils";
 import type { IssueStatus, Priority } from "@/lib/types";
 
@@ -80,11 +82,13 @@ export function Avatar({
   const cleanName = typeof name === "string" ? name.trim() : "";
   const seed = cleanName && cleanName !== "?" ? cleanName : "user";
   const title = cleanName && cleanName !== "?" ? cleanName : undefined;
+  const { ref } = useGaze({ travel: 6, lookAt: "pointer" });
 
   return (
     <Blobatar
+      ref={ref}
       name={seed}
-      animate="hover"
+      animate="always"
       background={background}
       className={cn("inline-block shrink-0 select-none", sizeCls, className)}
       title={title}
