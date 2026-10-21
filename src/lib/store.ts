@@ -163,6 +163,13 @@ function getState(): BlobStoreState {
   return g.__melouz_store;
 }
 
+function normalizeEtag(etag: string | null | undefined): string | null {
+  if (!etag) return null;
+  // `get()` exposes the raw HTTP ETag header (possibly weak and quoted), while
+  // `put({ ifMatch })` expects the API's raw value. Normalize before comparing.
+  return etag.replace(/^W\//, "").replace(/^"|"$/g, "") || null;
+}
+
 async function readDbBlob(): Promise<BlobCache> {
   let result;
   try {
@@ -173,7 +180,7 @@ async function readDbBlob(): Promise<BlobCache> {
   }
   if (!result) return { db: structuredClone(EMPTY_DB), etag: null, loadedAt: Date.now() };
   const text = await new Response(result.stream).text();
-  const etag = (result.blob as { etag?: string }).etag ?? null;
+  const etag = normalizeEtag((result.blob as { etag?: string }).etag);
   try {
     return { db: backfill(JSON.parse(text) as Partial<DB>), etag, loadedAt: Date.now() };
   } catch {
@@ -200,7 +207,7 @@ async function writeDbBlob(db: DB, etag: string | null): Promise<string | null> 
   };
   try {
     const result = await put(DB_BLOB_PATHNAME, body, options);
-    return (result as { etag?: string }).etag ?? null;
+    return normalizeEtag((result as { etag?: string }).etag);
   } catch (err) {
     if (err instanceof BlobPreconditionFailedError) return null; // conflict
     throw err;
@@ -220,6 +227,8 @@ async function mutateBlob<T>(fn: (db: DB) => T): Promise<T> {
       return result;
     }
     lastError = new BlobPreconditionFailedError();
+    // Jittered backoff so concurrent instances do not collide in lockstep.
+    await new Promise((resolve) => setTimeout(resolve, 40 + Math.random() * 160));
   }
   console.error("[store] blob write conflict: too many concurrent mutations");
   throw lastError ?? new Error("Failed to persist database");

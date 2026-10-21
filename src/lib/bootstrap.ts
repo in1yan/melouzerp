@@ -38,6 +38,23 @@ export async function ensureBootstrap(): Promise<void> {
     const isReset = resetRequested();
     const needsPassword = !existingAdmin || !hasCredential || isReset;
 
+    // Fast path: if everything is already provisioned, avoid a redundant write
+    // on every cold start (each write is a network round-trip and a conflict
+    // point when several instances boot at the same time).
+    const company = current.workspaces.find((w) => w.is_company);
+    const adminMembership =
+      company && existingAdmin
+        ? current.workspace_members.find(
+            (m) => m.workspace_id === company.id && m.user_id === existingAdmin.id
+          )
+        : undefined;
+    const hasOwner = company
+      ? current.workspace_members.some((m) => m.workspace_id === company.id && m.role === "owner")
+      : false;
+    if (!isReset && company && existingAdmin && hasCredential && adminMembership && hasOwner) {
+      return;
+    }
+
     // Only hash/surface a password when it will actually be stored. This avoids
     // printing a useless new password on every cold start for an existing admin.
     let passwordHash: string | null = null;
