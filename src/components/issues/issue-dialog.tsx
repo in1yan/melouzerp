@@ -237,6 +237,7 @@ export function IssueDialog({
   const canDelete =
     !!issue &&
     (issue.reporter?.id === user.id || workspace?.role === "admin" || workspace?.role === "owner");
+  const canChangeStatus = !!issue && (issue.reporter?.id === user.id || issue.assignee?.id === user.id);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -407,7 +408,7 @@ export function IssueDialog({
                   <select
                     value={issue.status}
                     onChange={(e) => patch({ status: e.target.value })}
-                    disabled={busy}
+                    disabled={busy || !canChangeStatus}
                     className={selectCls}
                   >
                     {ISSUE_STATUSES.map((s) => (

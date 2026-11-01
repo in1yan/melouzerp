@@ -40,6 +40,7 @@ interface BoardIssue {
   title: string;
   status: IssueStatus;
   priority: Priority;
+  reporter_id: string;
   due_date: string | null;
   order: number;
   assignee: { id: string; name: string; avatar_color: string } | null;
@@ -134,11 +135,13 @@ function Column({
   issues,
   onOpen,
   onQuickAdd,
+  canChangeStatus,
 }: {
   status: IssueStatus;
   issues: BoardIssue[];
   onOpen: (id: string) => void;
   onQuickAdd: (status: IssueStatus) => void;
+  canChangeStatus: (issue: BoardIssue) => boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
 
@@ -164,7 +167,7 @@ function Column({
         )}
       >
         {issues.map((i) => (
-          <Card key={i.id} issue={i} onOpen={onOpen} />
+          <Card key={i.id} issue={i} onOpen={onOpen} draggable={canChangeStatus(i)} />
         ))}
         {issues.length === 0 && (
           <div className="px-2 py-6 text-center text-xs text-muted-foreground">Drop issues here</div>
@@ -175,7 +178,7 @@ function Column({
 }
 
 function KanbanInner() {
-  const { workspace, loading: wsLoading } = useWorkspace();
+  const { user, workspace, loading: wsLoading } = useWorkspace();
   const search = useSearchParams();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [issues, setIssues] = useState<BoardIssue[]>([]);
@@ -221,6 +224,8 @@ function KanbanInner() {
   }, [issues]);
 
   const activeIssue = activeId ? issues.find((i) => i.id === activeId) ?? null : null;
+  const canChangeStatus = (issue: BoardIssue) =>
+    issue.reporter_id === user.id || issue.assignee?.id === user.id;
 
   const handleDragStart = (event: DragStartEvent) => {
     const id = String(event.active.id).replace(/^card:/, "");
@@ -312,6 +317,7 @@ function KanbanInner() {
                   issues={byStatus[s]}
                   onOpen={setDetailId}
                   onQuickAdd={(status) => setNewStatus(status)}
+                  canChangeStatus={canChangeStatus}
                 />
               ))}
             </div>

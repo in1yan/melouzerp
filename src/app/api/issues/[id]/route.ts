@@ -91,6 +91,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
     const { user } = await requireMember(project.workspace_id);
     const body = await parseBody(req, patchSchema);
 
+    if (body.status !== undefined && body.status !== issue.status &&
+        user.id !== issue.reporter_id && user.id !== issue.assignee_id) {
+      throw new ApiError(403, "Only the issue creator or assignee can change its status");
+    }
+
     if (body.assignee_id) {
       const db = await readDB();
       const isMember = db.workspace_members.some(
