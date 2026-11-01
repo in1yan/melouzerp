@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ interface TeamRow {
 
 export default function TeamsPage() {
   const { workspace, loading: wsLoading, user } = useWorkspace();
+  const router = useRouter();
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,8 +120,14 @@ export default function TeamsPage() {
   };
 
   useEffect(() => {
-    if (!wsLoading) load();
-  }, [wsLoading, load]);
+    if (workspace?.role === "employee") {
+      router.replace("/dashboard");
+    } else if (!wsLoading) {
+      load();
+    }
+  }, [workspace?.role, wsLoading, load, router]);
+
+  if (workspace?.role === "employee") return null;
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault();

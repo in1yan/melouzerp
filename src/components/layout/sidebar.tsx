@@ -34,14 +34,14 @@ import { useWorkspace } from "@/components/providers/workspace-provider";
 import { api } from "@/lib/client";
 import { toast } from "sonner";
 
-const navItems: { icon: typeof LayoutDashboard; label: string; href: string; adminOnly?: boolean }[] = [
+const navItems: { icon: typeof LayoutDashboard; label: string; href: string; adminOnly?: boolean; hideForEmployees?: boolean }[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: FolderKanban, label: "Projects", href: "/dashboard/projects" },
   { icon: CheckSquare, label: "Issues", href: "/dashboard/issues" },
   { icon: Layers, label: "Board", href: "/dashboard/kanban" },
   { icon: Calendar, label: "Calendar", href: "/dashboard/calendar" },
   { icon: FileText, label: "Documents", href: "/dashboard/documents" },
-  { icon: Users, label: "Teams", href: "/dashboard/teams" },
+  { icon: Users, label: "Teams", href: "/dashboard/teams", hideForEmployees: true },
   { icon: ShieldCheck, label: "Approvals", href: "/dashboard/approvals", adminOnly: true },
   { icon: HardDrive, label: "Storage", href: "/dashboard/storage", adminOnly: true },
   { icon: Gauge, label: "Performance", href: "/dashboard/performance" },
@@ -132,7 +132,10 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-        {navItems.filter((item) => !item.adminOnly || workspace?.role === "admin" || workspace?.role === "owner").map((item) => {
+        {navItems.filter((item) =>
+          (!item.adminOnly || workspace?.role === "admin" || workspace?.role === "owner") &&
+          (!item.hideForEmployees || workspace?.role !== "employee")
+        ).map((item) => {
           const active =
             item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
           return (
