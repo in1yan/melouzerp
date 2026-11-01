@@ -12,7 +12,16 @@ function smtpTransport(): Transporter | null {
   const host = process.env.SMTP_HOST?.trim();
   const user = process.env.SMTP_USER?.trim();
   const password = process.env.SMTP_PASSWORD;
-  if (!host || !user || !password) return null;
+  const configured = [host, user, password].filter(Boolean).length;
+  if (configured === 0) return null;
+  if (configured !== 3) {
+    const missing = [
+      !host && "SMTP_HOST",
+      !user && "SMTP_USER",
+      !password && "SMTP_PASSWORD",
+    ].filter(Boolean);
+    throw new Error(`SMTP is partially configured; missing ${missing.join(", ")}`);
+  }
 
   if (!transporter) {
     const port = Number(process.env.SMTP_PORT ?? 587);
